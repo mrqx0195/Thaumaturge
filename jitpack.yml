@@ -1,2 +1,5 @@
+before_install:
+  - ./gradlew runData
 install:
-  - ./gradlew runData clean build publishToMavenLocal -x test
+  - ./gradlew clean build publishToMavenLocal -x test
+  
