@@ -6,10 +6,15 @@ import com.leclowndu93150.thaumaturge.content.crucible.BlockEntityCrucible;
 import com.leclowndu93150.thaumaturge.content.device.BlockEntityEverfullUrn;
 import com.leclowndu93150.thaumaturge.content.device.BlockEntityVoidSiphon;
 import com.leclowndu93150.thaumaturge.content.device.fluxscrubber.BlockEntityFluxScrubber;
+import com.leclowndu93150.thaumaturge.content.device.mirror.BlockEntityMirror;
+import com.leclowndu93150.thaumaturge.content.device.mirror.BlockEntityMirrorEssentia;
+import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchObelisk;
+import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEntityEldritchObelisk;
 import com.leclowndu93150.thaumaturge.content.essentia.BlockEntityCentrifuge;
 import com.leclowndu93150.thaumaturge.content.essentia.advancedfurnace.BlockEntityAdvancedAlchemicalFurnace;
 import com.leclowndu93150.thaumaturge.content.essentia.crystalizer.BlockEntityEssentiaCrystalizer;
 import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJar;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJarBrain;
 import com.leclowndu93150.thaumaturge.content.essentia.reservoir.BlockEntityEssentiaReservoir;
 import com.leclowndu93150.thaumaturge.content.essentia.smeltery.BlockEntityAlembic;
 import com.leclowndu93150.thaumaturge.content.essentia.smeltery.BlockEntitySmelter;
@@ -38,6 +43,7 @@ import snownee.jade.api.BlockAccessor;
 final class JadeBlockProviderHolder {
     static final List<JadeBlockHandler<?>> HANDLERS = List.of(
             new JadeBlockHandler<>(BlockEntityJar.class, JadeConfig.JARS, JadeEssentiaDetails::jar),
+            new JadeBlockHandler<>(BlockEntityJarBrain.class, JadeConfig.BRAIN_JARS, JadeEssentiaDetails::brainJar),
             new JadeBlockHandler<>(BlockEntityTubeBuffer.class, JadeConfig.BUFFERS, JadeEssentiaDetails::buffer),
             new JadeBlockHandler<>(BlockEntityTubeValve.class, JadeConfig.VALVES, JadeEssentiaDetails::valve),
             new JadeBlockHandler<>(
@@ -79,7 +85,10 @@ final class JadeBlockProviderHolder {
             new JadeBlockHandler<>(
                     BlockEntityInfernalFurnace.class, JadeConfig.INFERNAL_FURNACES, JadeMachineDetails::furnace),
             new JadeBlockHandler<>(
-                    BlockEntityFocalManipulator.class, JadeConfig.FOCAL_MANIPULATORS, JadeMachineDetails::focal));
+                    BlockEntityFocalManipulator.class, JadeConfig.FOCAL_MANIPULATORS, JadeMachineDetails::focal),
+            new JadeBlockHandler<>(BlockEntityMirror.class, JadeConfig.MIRRORS, JadeMachineDetails::mirror),
+            new JadeBlockHandler<>(
+                    BlockEntityMirrorEssentia.class, JadeConfig.ESSENTIA_MIRRORS, JadeMachineDetails::essentiaMirror));
     private static final Map<Block, Class<? extends BlockEntity>> CONTROLLERS = Map.of(
             TTBlocks.PLACEHOLDER_IRON_BARS.get(),
             BlockEntityGolemBuilder.class,
@@ -105,6 +114,12 @@ final class JadeBlockProviderHolder {
     private JadeBlockProviderHolder() {}
 
     static @Nullable BlockEntity resolve(BlockAccessor accessor) {
+        if (accessor.getBlockState().getBlock() instanceof BlockEldritchObelisk) {
+            BlockPos basePos = BlockEldritchObelisk.basePos(accessor.getBlockState(), accessor.getPosition());
+            if (!accessor.getLevel().hasChunkAt(basePos)) return null;
+            BlockEntity base = accessor.getLevel().getBlockEntity(basePos);
+            if (base instanceof BlockEntityEldritchObelisk) return base;
+        }
         BlockEntityThaumatorium thaumatorium = resolveThaumatorium(accessor);
         if (thaumatorium != null) return thaumatorium;
         BlockEntityAdvancedAlchemicalFurnace furnace = AdvancedFurnaceJadeAccess.resolve(accessor);

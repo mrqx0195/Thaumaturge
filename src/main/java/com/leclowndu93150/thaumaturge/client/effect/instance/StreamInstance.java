@@ -54,7 +54,7 @@ public abstract class StreamInstance implements IFXInstance {
     private double motionY;
     private double motionZ;
     private int dissolveStart = -1;
-    private boolean expired;
+    private boolean targetMissing;
 
     protected StreamInstance(double sx, double sy, double sz, int color, int waveSeed, float scale) {
         this.originX = sx;
@@ -103,7 +103,11 @@ public abstract class StreamInstance implements IFXInstance {
 
     @Override
     public final boolean isExpired() {
-        return this.expired;
+        return expired(this.age, this.maxAge, this.length, this.targetMissing);
+    }
+
+    static boolean expired(int age, int maxAge, int length, boolean targetMissing) {
+        return targetMissing || age >= maxAge || length < 1;
     }
 
     @Override
@@ -112,13 +116,12 @@ public abstract class StreamInstance implements IFXInstance {
         if (level == null) {
             return;
         }
-        if (this.age++ >= this.maxAge || this.length < 1) {
-            this.expired = true;
+        if (isExpired()) {
             return;
         }
         Vec3 target = seekTarget(level);
         if (target == null) {
-            this.expired = true;
+            this.targetMissing = true;
             return;
         }
         this.motionY += RISE_PER_TICK;
@@ -159,6 +162,7 @@ public abstract class StreamInstance implements IFXInstance {
             this.trail.remove(0);
         }
         afterStep(level);
+        this.age++;
     }
 
     protected final void clampMotion(double limit) {
@@ -202,9 +206,7 @@ public abstract class StreamInstance implements IFXInstance {
             points[slot][1] = point.y() + Mth.sin(beat / 7.0F) * wobble;
             points[slot][2] = point.z() + Mth.sin(beat / 8.0F) * wobble;
             double radius = point.radius() * (1.0F + Mth.sin(beat / 3.0F) * RADIUS_VARIANCE) * radiusScale;
-            if (phase > n - TAPER_SPAN) {
-                radius *= Mth.cos((float) ((phase - (n - TAPER_LEAD)) / (float) TAPER_SPAN * (Math.PI / 2.0)));
-            }
+            radius *= tailTaper(phase, n);
             radii[slot] = anchorRadius(slot, radius);
             colour(colours[slot], beat);
         }
@@ -220,6 +222,13 @@ public abstract class StreamInstance implements IFXInstance {
             case 4 -> (this.radiusBase + radius * 2.0) / 3.0;
             default -> radius;
         };
+    }
+
+    static double tailTaper(int phase, int pointCount) {
+        if (phase <= pointCount - TAPER_SPAN) {
+            return 1.0;
+        }
+        return Math.max(0.0, Math.cos((phase - (pointCount - TAPER_LEAD)) / (double) TAPER_SPAN * (Math.PI / 2.0)));
     }
 
     protected void colour(float[] out, int beat) {

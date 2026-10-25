@@ -1,6 +1,6 @@
 package com.leclowndu93150.thaumaturge.client.effect.manager;
 
-import com.leclowndu93150.thaumaturge.client.effect.geometry.PolyCone;
+import com.leclowndu93150.thaumaturge.client.effect.geometry.TubeMesh;
 import com.leclowndu93150.thaumaturge.client.effect.instance.ArcInstance;
 import com.leclowndu93150.thaumaturge.client.effect.instance.BeamInstance;
 import com.leclowndu93150.thaumaturge.client.effect.instance.BoltInstance;
@@ -19,6 +19,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.util.FastColor.ARGB32;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -30,19 +31,36 @@ public final class BeamManager extends AbstractFXManager<IFXInstance> {
     private static final List<BoltInstance> BOLTS = new ArrayList<>();
     private static final List<BeamInstance> BEAMS = new ArrayList<>();
     private static final float ARC_SIZE = 0.125F;
+    private static final float ARC_CROSS_HALF_WIDTH = ARC_SIZE * Mth.SQRT_OF_TWO;
     private static final float SOURCE_QUAD_SIZE = 0.33F;
+    private static final float HIT_QUAD_SIZE = 0.3F;
+    private static final float HIT_WHITE_MIX = 0.5F;
+    private static final double MIN_BEAM_LENGTH = 1.0E-3;
 
     private BeamManager() {}
 
     public static void addArc(ArcInstance instance) {
-        ARCS.add(instance);
+        if (!instance.isExpired()) {
+            ARCS.add(instance);
+        }
     }
 
     public static void addBolt(BoltInstance instance) {
-        BOLTS.add(instance);
+        if (!instance.isExpired()) {
+            BOLTS.add(instance);
+        }
     }
 
     public static void addBeam(BeamInstance instance) {
+        if (instance.isExpired()) {
+            return;
+        }
+        for (BeamInstance existing : BEAMS) {
+            if (existing.sameSourceAs(instance)) {
+                existing.refresh(instance);
+                return;
+            }
+        }
         BEAMS.add(instance);
     }
 
@@ -99,68 +117,83 @@ public final class BeamManager extends AbstractFXManager<IFXInstance> {
 
     private static void renderBeam(
             PoseStack poseStack, MultiBufferSource bufSource, BeamInstance beam, Vec3 camPos, float partialTick) {
-        VertexConsumer trunk = bufSource.getBuffer(BeamRenderType.trunkForType(beam.beamType()));
         Vec3 source = beam.sourcePos(partialTick);
         Vec3 target = beam.targetPos(partialTick);
         float size = beam.computeSize(partialTick);
         float op = beam.computeOpacity(partialTick);
-        float texScroll = beam.texScroll(partialTick);
-        float rot = beam.worldRotation(partialTick);
-        float yaw = beam.yawAt(partialTick);
-        float pitch = beam.pitchAt(partialTick);
         float length = (float) source.distanceTo(target);
-        int color = ARGB32.colorFromFloat(op, beam.colorR(), beam.colorG(), beam.colorB());
+        if (shouldRenderBeam(length, size, op)) {
+            VertexConsumer trunk = bufSource.getBuffer(BeamRenderType.trunkForType(beam.beamType()));
+            float texScroll = beam.texScroll(partialTick);
+            float rot = beam.worldRotation(partialTick);
+            float yaw = beam.yawAt(partialTick);
+            float pitch = beam.pitchAt(partialTick);
+            int color = ARGB32.colorFromFloat(op, beam.colorR(), beam.colorG(), beam.colorB());
 
-        poseStack.pushPose();
-        poseStack.translate(source.x - camPos.x, source.y - camPos.y, source.z - camPos.z);
-        poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(90.0)));
-        poseStack.mulPose(new Quaternionf().rotateZ((float) Math.toRadians(-(180.0F + yaw))));
-        poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(pitch)));
-        poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(rot)));
-        Matrix4f mat = poseStack.last().pose();
+            poseStack.pushPose();
+            poseStack.translate(source.x - camPos.x, source.y - camPos.y, source.z - camPos.z);
+            poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(90.0)));
+            poseStack.mulPose(new Quaternionf().rotateZ((float) Math.toRadians(-(180.0F + yaw))));
+            poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(pitch)));
+            poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(rot)));
+            Matrix4f mat = poseStack.last().pose();
 
-        double base = 0.15 * size;
-        double baseEnd = base * beam.endMod();
+            double base = 0.15 * size;
+            double baseEnd = base * beam.endMod();
 
-        for (int t = 0; t < 3; t++) {
-            poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(60.0)));
-            Matrix4f stripMat = poseStack.last().pose();
-            float u0 = 0.0F;
-            float u1 = 1.0F;
-            float v0 = -1.0F + texScroll + t / 3.0F;
-            float v1 = length * size + v0;
-            beamVertex(trunk, stripMat, -baseEnd, length * size, 0.0, u1, v1, color);
-            beamVertex(trunk, stripMat, -base, 0.0, 0.0, u1, v0, color);
-            beamVertex(trunk, stripMat, base, 0.0, 0.0, u0, v0, color);
-            beamVertex(trunk, stripMat, baseEnd, length * size, 0.0, u0, v1, color);
+            for (int t = 0; t < 3; t++) {
+                poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(60.0)));
+                Matrix4f stripMat = poseStack.last().pose();
+                float u0 = 0.0F;
+                float u1 = 1.0F;
+                float v0 = -1.0F + texScroll + t / 3.0F;
+                float v1 = length * size + v0;
+                beamVertex(trunk, stripMat, -baseEnd, length * size, 0.0, u1, v1, color);
+                beamVertex(trunk, stripMat, -base, 0.0, 0.0, u1, v0, color);
+                beamVertex(trunk, stripMat, base, 0.0, 0.0, u0, v0, color);
+                beamVertex(trunk, stripMat, baseEnd, length * size, 0.0, u0, v1, color);
+            }
+            poseStack.popPose();
         }
-        poseStack.popPose();
 
         if (beam.withSource()) {
             VertexConsumer node = bufSource.getBuffer(BeamRenderType.NODE_TYPE);
-            int partFrame = beam.age() % 32;
-            float u0 = partFrame / 32.0F;
-            float u1 = u0 + 0.03125F;
-            float v0 = 0.09375F;
-            float v1 = v0 + 0.03125F;
             float sourceOp = 0.8F;
             if (beam.maxAge() - beam.age() <= 4) {
                 sourceOp = 0.8F - (4 - (beam.maxAge() - beam.age())) * 0.2F;
             }
             int sourceColor = ARGB32.colorFromFloat(sourceOp, beam.colorR(), beam.colorG(), beam.colorB());
-            float halfSize = SOURCE_QUAD_SIZE;
-            poseStack.pushPose();
-            poseStack.translate(source.x - camPos.x, source.y - camPos.y, source.z - camPos.z);
-            Quaternionf cameraRot = new Quaternionf();
-            Minecraft.getInstance().gameRenderer.getMainCamera().rotation().normalize(cameraRot);
-            poseStack.mulPose(cameraRot);
-            Matrix4f sm = poseStack.last().pose();
-            node.addVertex(sm, -halfSize, -halfSize, 0.0F).setColor(sourceColor).setUv(u1, v1);
-            node.addVertex(sm, -halfSize, halfSize, 0.0F).setColor(sourceColor).setUv(u1, v0);
-            node.addVertex(sm, halfSize, halfSize, 0.0F).setColor(sourceColor).setUv(u0, v0);
-            node.addVertex(sm, halfSize, -halfSize, 0.0F).setColor(sourceColor).setUv(u0, v1);
-            poseStack.popPose();
+            drawNodeQuad(poseStack, node, camPos, source, beam.age(), SOURCE_QUAD_SIZE, sourceColor);
         }
+        if (beam.hit()) {
+            VertexConsumer node = bufSource.getBuffer(BeamRenderType.NODE_TYPE);
+            int flareColor = ARGB32.colorFromFloat(
+                    1.0F,
+                    Mth.lerp(HIT_WHITE_MIX, beam.colorR(), 1.0F),
+                    Mth.lerp(HIT_WHITE_MIX, beam.colorG(), 1.0F),
+                    Mth.lerp(HIT_WHITE_MIX, beam.colorB(), 1.0F));
+            float halfSize = HIT_QUAD_SIZE * beam.hitFactor(partialTick);
+            drawNodeQuad(poseStack, node, camPos, target, beam.age(), halfSize, flareColor);
+        }
+    }
+
+    private static void drawNodeQuad(
+            PoseStack poseStack, VertexConsumer node, Vec3 camPos, Vec3 at, int age, float halfSize, int color) {
+        float u0 = (age % 32) / 32.0F;
+        float u1 = u0 + 0.03125F;
+        float v0 = 0.09375F;
+        float v1 = v0 + 0.03125F;
+        poseStack.pushPose();
+        poseStack.translate(at.x - camPos.x, at.y - camPos.y, at.z - camPos.z);
+        Quaternionf cameraRot = new Quaternionf();
+        Minecraft.getInstance().gameRenderer.getMainCamera().rotation().normalize(cameraRot);
+        poseStack.mulPose(cameraRot);
+        Matrix4f matrix = poseStack.last().pose();
+        node.addVertex(matrix, -halfSize, -halfSize, 0.0F).setColor(color).setUv(u1, v1);
+        node.addVertex(matrix, -halfSize, halfSize, 0.0F).setColor(color).setUv(u1, v0);
+        node.addVertex(matrix, halfSize, halfSize, 0.0F).setColor(color).setUv(u0, v0);
+        node.addVertex(matrix, halfSize, -halfSize, 0.0F).setColor(color).setUv(u0, v1);
+        poseStack.popPose();
     }
 
     private static void beamVertex(
@@ -170,29 +203,51 @@ public final class BeamManager extends AbstractFXManager<IFXInstance> {
 
     private static void renderArc(
             PoseStack poseStack, VertexConsumer consumer, ArcInstance arc, Vec3 camPos, float partialTick) {
+        float alpha = arc.alpha(partialTick);
+        if (!shouldRenderArc(arc.length, alpha)) {
+            return;
+        }
         poseStack.pushPose();
         poseStack.translate(arc.startX - camPos.x, arc.startY - camPos.y, arc.startZ - camPos.z);
         Matrix4f mat = poseStack.last().pose();
-        float alpha = arc.alpha(partialTick);
-        if (alpha <= 0.0F) {
-            poseStack.popPose();
-            return;
-        }
         int color = ARGB32.colorFromFloat(alpha, arc.colorR, arc.colorG, arc.colorB);
         int n = arc.points.size();
         if (n < 2) {
             poseStack.popPose();
             return;
         }
+        Vec3 side = arcHorizontalSide(arc.points.get(n - 1));
         for (int c = 0; c < n - 1; c++) {
             Vec3 v0 = arc.points.get(c);
             Vec3 v1 = arc.points.get(c + 1);
-            float u0 = c / arc.length;
-            float u1 = (c + 1) / arc.length;
+            float u0 = arcTextureU(c, arc.length);
+            float u1 = arcTextureU(c + 1, arc.length);
             emitArcQuadY(consumer, mat, v0, v1, u0, u1, color, ARC_SIZE);
-            emitArcQuadXZ(consumer, mat, v0, v1, u0, u1, color, ARC_SIZE);
+            emitArcQuadXZ(consumer, mat, v0, v1, u0, u1, color, side, ARC_CROSS_HALF_WIDTH);
         }
         poseStack.popPose();
+    }
+
+    static Vec3 arcHorizontalSide(Vec3 endpoint) {
+        double sideX = -endpoint.z;
+        double sideZ = endpoint.x;
+        double flat = Math.sqrt(sideX * sideX + sideZ * sideZ);
+        if (flat < MIN_BEAM_LENGTH) {
+            return new Vec3(1.0, 0.0, 0.0);
+        }
+        return new Vec3(sideX / flat, 0.0, sideZ / flat);
+    }
+
+    static float arcTextureU(int pointIndex, float chordLength) {
+        return chordLength > 0.0F ? pointIndex / chordLength : 0.0F;
+    }
+
+    static boolean shouldRenderArc(double length, float alpha) {
+        return length >= MIN_BEAM_LENGTH && alpha > 0.0F;
+    }
+
+    static boolean shouldRenderBeam(double length, float size, float opacity) {
+        return length >= MIN_BEAM_LENGTH && size > 0.0F && opacity > 0.0F;
     }
 
     private static void emitArcQuadY(
@@ -204,11 +259,21 @@ public final class BeamManager extends AbstractFXManager<IFXInstance> {
     }
 
     private static void emitArcQuadXZ(
-            VertexConsumer consumer, Matrix4f mat, Vec3 v0, Vec3 v1, float u0, float u1, int color, float size) {
-        vertex(consumer, mat, v0.x - size, v0.y, v0.z - size, u0, 1.0F, color);
-        vertex(consumer, mat, v0.x + size, v0.y, v0.z + size, u0, 0.0F, color);
-        vertex(consumer, mat, v1.x + size, v1.y, v1.z + size, u1, 0.0F, color);
-        vertex(consumer, mat, v1.x - size, v1.y, v1.z - size, u1, 1.0F, color);
+            VertexConsumer consumer,
+            Matrix4f mat,
+            Vec3 v0,
+            Vec3 v1,
+            float u0,
+            float u1,
+            int color,
+            Vec3 side,
+            float halfWidth) {
+        double sx = side.x * halfWidth;
+        double sz = side.z * halfWidth;
+        vertex(consumer, mat, v0.x - sx, v0.y, v0.z - sz, u0, 1.0F, color);
+        vertex(consumer, mat, v0.x + sx, v0.y, v0.z + sz, u0, 0.0F, color);
+        vertex(consumer, mat, v1.x + sx, v1.y, v1.z + sz, u1, 0.0F, color);
+        vertex(consumer, mat, v1.x - sx, v1.y, v1.z - sz, u1, 1.0F, color);
     }
 
     private static void vertex(
@@ -242,9 +307,9 @@ public final class BeamManager extends AbstractFXManager<IFXInstance> {
             colours[i][3] = alpha;
             radii[i] = s.width() / 10.0;
         }
-        PolyCone.render(poseStack, consumer, points, colours, radii, 0, 1.0F, 0.0F);
+        TubeMesh.draw(poseStack, consumer, points, colours, radii, 0, 1.0F, 0.0F);
         for (int i = 0; i < n; i++) radii[i] /= 3.0;
-        PolyCone.render(poseStack, consumer, points, colours, radii, 0, 1.0F, 0.0F);
+        TubeMesh.draw(poseStack, consumer, points, colours, radii, 0, 1.0F, 0.0F);
         poseStack.popPose();
     }
 

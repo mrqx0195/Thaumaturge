@@ -19,9 +19,11 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.RangedAttackGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.player.Player;
@@ -47,6 +49,8 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
     private static final float ARROW_VELOCITY = 2.0F;
     private static final float ARROW_INACCURACY = 2.0F;
     private static final double MOVE_DAMPING = 20.0;
+    private static final double KNOCKBACK_SHARE = 0.2;
+    private static final double MAX_KNOCKBACK_RISE = 0.1;
 
     private int swingProgressInt;
     private boolean swingInProgress;
@@ -59,6 +63,12 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
 
     public EntityTurretCrossbow(EntityType<? extends EntityTurretCrossbow> type, Level level) {
         super(type, level);
+        this.lookControl = new ConstructLookControl(this);
+    }
+
+    @Override
+    protected PathNavigation createNavigation(Level level) {
+        return new StationaryNavigation(this, level);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -72,11 +82,23 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
     protected void registerGoals() {
         goalSelector.addGoal(1, new RangedAttackGoal(this, 0.0, 20, 60, 24.0F));
         goalSelector.addGoal(2, new WatchTargetGoal(this));
-        targetSelector.addGoal(1, new HurtByTargetGoal(this));
+        targetSelector.addGoal(1, retaliateGoal(this));
         targetSelector.addGoal(
                 2,
                 new NearestAttackableTargetGoal<>(
                         this, LivingEntity.class, 5, true, false, entity -> entity instanceof Enemy));
+    }
+
+    static Goal retaliateGoal(EntityTurretCrossbow turret) {
+        return new RetaliateGoal(turret);
+    }
+
+    protected boolean mayRetaliateAgainst(LivingEntity attacker) {
+        return true;
+    }
+
+    protected double knockbackShare() {
+        return KNOCKBACK_SHARE;
     }
 
     @Override
@@ -170,10 +192,8 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
             setTarget(null);
         }
         if (!level().isClientSide()) {
-            yBodyRot = yHeadRot;
-            if (tickCount % HEAL_INTERVAL == 0) {
-                heal(1.0F);
-            }
+            swivelWithHead();
+            regenerate(HEAL_INTERVAL, 1.0F);
             followActivatorRail();
         } else {
             updateArmSwingProgress();
@@ -253,18 +273,21 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
     @Override
     public boolean hurt(DamageSource source, float amount) {
         if (!(level() instanceof ServerLevel level)) return false;
-        setYRot((float) (getYRot() + random.nextGaussian() * 45.0));
-        setXRot((float) (getXRot() + random.nextGaussian() * 20.0));
+        jolt();
         return super.hurt(source, amount);
     }
 
     @Override
     public void knockback(double strength, double x, double z) {
-        super.knockback(strength, x, z);
+        super.knockback(knockbackPower(strength, knockbackShare()), x, z);
         Vec3 movement = getDeltaMovement();
-        if (movement.y > 0.1) {
-            setDeltaMovement(movement.x, 0.1, movement.z);
+        if (movement.y > MAX_KNOCKBACK_RISE) {
+            setDeltaMovement(movement.x, MAX_KNOCKBACK_RISE, movement.z);
         }
+    }
+
+    static double knockbackPower(double power, double share) {
+        return power * share;
     }
 
     @Override
@@ -294,7 +317,7 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
 
     @Override
     public void move(MoverType type, Vec3 movement) {
-        super.move(type, new Vec3(movement.x / moveDamping(), movement.y, movement.z / moveDamping()));
+        super.move(type, dampHorizontalMovement(type, movement, moveDamping()));
     }
 
     protected double moveDamping() {
@@ -324,5 +347,20 @@ public class EntityTurretCrossbow extends EntityOwnedConstruct implements Ranged
     @Override
     public int getHeadRotSpeed() {
         return 20;
+    }
+
+    private static final class RetaliateGoal extends HurtByTargetGoal {
+        private final EntityTurretCrossbow turret;
+
+        private RetaliateGoal(EntityTurretCrossbow turret) {
+            super(turret);
+            this.turret = turret;
+        }
+
+        @Override
+        public boolean canUse() {
+            LivingEntity attacker = turret.getLastHurtByMob();
+            return super.canUse() && attacker != null && turret.mayRetaliateAgainst(attacker);
+        }
     }
 }

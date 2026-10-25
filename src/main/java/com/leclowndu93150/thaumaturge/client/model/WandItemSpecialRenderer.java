@@ -17,8 +17,6 @@ import com.leclowndu93150.thaumaturge.registry.TTDataComponents;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -43,21 +41,15 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
     private static final float PX = 0.0625F;
     private static final int TEX_W = 32;
     private static final int TEX_H = 32;
-    private static final int RUNE_LIGHT = 200;
+    private static final int RUNE_LIGHT = WandLightMath.smoothPacked(236);
     private static final float MODEL_LIFT = 0.5F;
     private static final float FOCUS_ALPHA = 0.95F;
-    private static final int SCEPTRE_RUNE_COUNT = 10;
-    private static final int STAFF_RUNE_SIDES = 4;
-    private static final int STAFF_RUNE_LENGTH = 14;
     private static final int SCRIPT_GLYPHS = 16;
     private static final float STAFF_MODEL_SHIFT = 0.2F;
     private static final float FOCUS_STAFF_LIFT = -0.0475F;
     private static final float FOCUS_STAFF_SCALE_Y = 0.5525F;
     private static final float FOCUS_SCALE = 0.5F;
     private static final float FOCUS_TOP_PX = 6.0F;
-    private static final float CAP_TOP_PX = 1.0F;
-    private static final float CAP_STAFF_SCALE_Y = 1.1F;
-    private static final float SCEPTRE_CAP_SCALE = 1.3F;
 
     public WandItemSpecialRenderer() {
         super(
@@ -80,18 +72,6 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
         WandRenderers.render(context(stack, arg, poseStack, buffers, light, overlay, displayContext, false));
         poseStack.popPose();
     }
-
-    private record CapPlacement(float offsetY, float scaleXZ, float scaleY, float pivotPx) {}
-
-    private record RuneSpot(float yaw, float distance, float height, float depth, int glyph) {}
-
-    private static final float SCEPTRE_RUNE_DISTANCE = 0.16F;
-    private static final float SCEPTRE_RUNE_DEPTH = -0.125F;
-    private static final float STAFF_RUNE_START = 0.36F;
-    private static final float STAFF_RUNE_STEP = 0.14F;
-    private static final float STAFF_RUNE_DEPTH = -0.08F;
-    private static final float RUNE_HEIGHT = -0.01F;
-    private static final float CAP_PIVOT_BOTTOM_PX = 20.0F;
 
     public static void submitParts(WandArg arg, PoseStack poseStack, MultiBufferSource buffers, int light) {
         submitParts(arg, poseStack, buffers, light, false);
@@ -126,11 +106,9 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
         if (arg.hasFocus()) {
             submitFocus(arg, poseStack, buffers, staff, ticks);
         }
-        for (RuneSpot spot : runeLayout(arg, ticks)) {
-            poseStack.pushPose();
-            poseStack.mulPose(Axis.YP.rotationDegrees(spot.yaw()));
-            submitRune(poseStack, buffers, spot, ticks);
-            poseStack.popPose();
+        for (WandRuneLayout.Rune rune :
+                WandRuneLayout.create(arg.sceptre(), arg.rod().runes(), staff, ticks)) {
+            submitRune(poseStack.last(), buffers.getBuffer(RUNES), rune, ticks);
         }
         poseStack.popPose();
     }
@@ -144,7 +122,7 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
             float ticks,
             boolean firstPersonHand,
             int rodTint) {
-        int rodLight = arg.rod().glow() ? (int) (200.0F + Mth.sin((int) ticks) * 5.0F + 5.0F) : light;
+        int rodLight = arg.rod().glow() ? glowLight(ticks) : light;
         RenderType rodType = firstPersonHand
                 ? RenderType.entityCutoutNoCull(arg.rod().texture())
                 : TTFlatRenderTypes.entityCutoutFlat(arg.rod().texture());
@@ -153,25 +131,8 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
             poseStack.translate(0.0F, -0.1F, 0.0F);
             poseStack.scale(1.2F, 2.0F, 1.2F);
         }
-        box(poseStack.last(), buffers.getBuffer(rodType), -1.0F, 1.0F, -1.0F, 2, 18, 2, 0, 8, rodTint, rodLight);
+        box(poseStack.last(), buffers.getBuffer(rodType), -1.0F, 0.0F, -1.0F, 2, 18, 2, 0, 8, rodTint, rodLight);
         poseStack.popPose();
-    }
-
-    private static List<CapPlacement> capLayout(boolean staff, boolean sceptre) {
-        List<CapPlacement> layout = new ArrayList<>();
-        if (sceptre) {
-            layout.add(new CapPlacement(0.0F, SCEPTRE_CAP_SCALE, SCEPTRE_CAP_SCALE, 0.0F));
-            layout.add(new CapPlacement(0.3F, 1.0F, 0.66F, 0.0F));
-        } else {
-            layout.add(new CapPlacement(0.0F, 1.0F, 1.0F, 0.0F));
-        }
-        if (staff) {
-            layout.add(new CapPlacement(0.225F, 1.0F, 0.66F, 0.0F));
-            layout.add(new CapPlacement(0.875F, 1.0F, 1.0F, CAP_PIVOT_BOTTOM_PX));
-        } else {
-            layout.add(new CapPlacement(0.0F, 1.0F, 1.0F, CAP_PIVOT_BOTTOM_PX));
-        }
-        return layout;
     }
 
     private static void submitCaps(
@@ -186,16 +147,13 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
                 ? RenderType.entityCutoutNoCull(arg.cap().texture())
                 : TTFlatRenderTypes.entityCutoutFlat(arg.cap().texture());
         poseStack.pushPose();
-        if (staff) {
-            poseStack.scale(1.3F, CAP_STAFF_SCALE_Y, 1.3F);
-        } else {
-            poseStack.scale(1.2F, 1.0F, 1.2F);
-        }
-        for (CapPlacement placement : capLayout(staff, arg.sceptre())) {
+        float outerScaleXZ = WandCapLayout.outerScaleXZ(staff);
+        poseStack.scale(outerScaleXZ, WandCapLayout.outerScaleY(staff), outerScaleXZ);
+        for (WandCapLayout.Placement placement : WandCapLayout.create(staff, arg.sceptre())) {
             poseStack.pushPose();
             poseStack.translate(0.0F, placement.offsetY(), 0.0F);
             poseStack.scale(placement.scaleXZ(), placement.scaleY(), placement.scaleXZ());
-            poseStack.translate(0.0F, placement.pivotPx() * PX, 0.0F);
+            poseStack.translate(0.0F, placement.pivotPixels() * PX, 0.0F);
             box(poseStack.last(), buffers.getBuffer(capType), -1.0F, -1.0F, -1.0F, 2, 2, 2, 0, 0, capTint, light);
             poseStack.popPose();
         }
@@ -213,37 +171,9 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
             poseStack.scale(FOCUS_SCALE, FOCUS_SCALE, FOCUS_SCALE);
         }
         int tint = ARGB32.color((int) (FOCUS_ALPHA * 255.0F), arg.focusColor());
-        int focusLight = (int) (195.0F + Mth.sin(ticks / 3.0F) * 10.0F + 10.0F);
+        int focusLight = WandLightMath.focus(ticks);
         box(poseStack.last(), buffers.getBuffer(focusType), -3.0F, -6.0F, -3.0F, 6, 6, 6, 0, 0, tint, focusLight);
         poseStack.popPose();
-    }
-
-    private static List<RuneSpot> runeLayout(WandArg arg, float ticks) {
-        List<RuneSpot> spots = new ArrayList<>();
-        if (arg.sceptre()) {
-            for (int i = 0; i < SCEPTRE_RUNE_COUNT; i++) {
-                spots.add(new RuneSpot(
-                        360.0F / SCEPTRE_RUNE_COUNT * i + ticks,
-                        SCEPTRE_RUNE_DISTANCE,
-                        RUNE_HEIGHT,
-                        SCEPTRE_RUNE_DEPTH,
-                        i));
-            }
-        }
-        if (arg.rod().runes()) {
-            for (int side = 0; side < STAFF_RUNE_SIDES; side++) {
-                float yaw = 360.0F / STAFF_RUNE_SIDES * (side + 1);
-                for (int step = 0; step < STAFF_RUNE_LENGTH; step++) {
-                    spots.add(new RuneSpot(
-                            yaw,
-                            STAFF_RUNE_START + step * STAFF_RUNE_STEP,
-                            RUNE_HEIGHT,
-                            STAFF_RUNE_DEPTH,
-                            (step + side * 3) % SCRIPT_GLYPHS));
-                }
-            }
-        }
-        return spots;
     }
 
     public static float tipModelY(WandArg arg) {
@@ -255,12 +185,12 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
             return -FOCUS_TOP_PX * PX * FOCUS_SCALE;
         }
         if (staff) {
-            return STAFF_MODEL_SHIFT - CAP_TOP_PX * PX * CAP_STAFF_SCALE_Y;
+            return STAFF_MODEL_SHIFT - WandCapLayout.outerScaleY(true) * PX;
         }
         if (arg.sceptre()) {
-            return -CAP_TOP_PX * PX * SCEPTRE_CAP_SCALE;
+            return -1.3F * PX;
         }
-        return -CAP_TOP_PX * PX;
+        return -PX;
     }
 
     private static float clientTicks() {
@@ -270,37 +200,51 @@ public final class WandItemSpecialRenderer extends BlockEntityWithoutLevelRender
                 : player.tickCount + Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
     }
 
-    private static final int[][] RUNE_QUAD_SIGNS = {{-1, 1}, {1, 1}, {1, -1}, {-1, -1}};
-
-    private static float pulse(float phase, float period, float base) {
-        return Mth.sin(phase / period) * 0.1F + base;
+    private static int glowLight(float ticks) {
+        return WandLightMath.glow(ticks);
     }
 
-    private static void submitRune(PoseStack poseStack, MultiBufferSource buffers, RuneSpot spot, float ticks) {
-        float phase = ticks + spot.glyph() * 5;
-        float red = Math.min(1.0F, pulse(phase, 5.0F, 0.88F));
-        float green = Math.min(1.0F, pulse(phase, 7.0F, 0.63F));
-        float wobble = Mth.sin(phase / 10.0F) * 0.2F;
-        int tint = ARGB32.colorFromFloat(Math.min(1.0F, wobble + 0.6F), red, green, 0.2F);
-        float glyphU = spot.glyph() / (float) SCRIPT_GLYPHS;
+    private static final float[] RUNE_CORNER_X = {-1.0F, 1.0F, 1.0F, -1.0F};
+    private static final float[] RUNE_CORNER_Y = {-1.0F, -1.0F, 1.0F, 1.0F};
+    private static final float HALF_UV = 0.5F;
+    private static final float RUNE_HALF_BASE = 1.0F;
+    private static final float RUNE_SIZE_PULSE = 0.14F;
+    private static final float RUNE_ALPHA_BASE = 0.62F;
+    private static final float RUNE_ALPHA_PULSE = 0.3F;
+    private static final float RUNE_GREEN_BASE = 0.66F;
+    private static final float RUNE_GREEN_PULSE = 0.08F;
+
+    private static void submitRune(PoseStack.Pose pose, VertexConsumer buffer, WandRuneLayout.Rune rune, float ticks) {
+        float yaw = rune.yawDegrees() * Mth.DEG_TO_RAD;
+        float outX = Mth.sin(yaw);
+        float outZ = Mth.cos(yaw);
+        float rightX = -outZ;
+        float rightZ = outX;
+        float pulse = WandRuneLayout.pulse(ticks, rune.slot());
+        float swell = WandRuneLayout.swell(ticks, rune.slot());
+        float half = rune.halfSize() * RUNE_HALF_BASE * (1.0F + swell * RUNE_SIZE_PULSE);
+        float green = Mth.clamp(RUNE_GREEN_BASE + pulse * RUNE_GREEN_PULSE, 0.0F, 1.0F);
+        float alpha = Mth.clamp(RUNE_ALPHA_BASE + pulse * RUNE_ALPHA_PULSE, 0.0F, 1.0F);
+        int tint = ARGB32.colorFromFloat(alpha, 1.0F, green, 0.18F);
+        float centerX = outX * rune.radius();
+        float centerZ = outZ * rune.radius();
+        float glyphU = rune.glyph() / (float) SCRIPT_GLYPHS;
         float glyphWidth = 1.0F / SCRIPT_GLYPHS;
-        float half = 0.06F + wobble / 40.0F;
-        poseStack.pushPose();
-        poseStack.mulPose(Axis.ZP.rotationDegrees(90.0F));
-        poseStack.translate(spot.distance(), spot.height(), spot.depth());
-        PoseStack.Pose pose = poseStack.last();
-        VertexConsumer buffer = buffers.getBuffer(RUNES);
-        for (int[] corner : RUNE_QUAD_SIGNS) {
-            float u = corner[1] > 0 ? glyphU + glyphWidth : glyphU;
-            float v = corner[0] < 0 ? 1.0F : 0.0F;
-            buffer.addVertex(pose, corner[0] * half, corner[1] * half, 0.0F)
+        for (int corner = 0; corner < RUNE_CORNER_X.length; corner++) {
+            float cornerX = RUNE_CORNER_X[corner];
+            float cornerY = RUNE_CORNER_Y[corner];
+            float x = centerX + rightX * cornerX * half;
+            float y = rune.y() + cornerY * half;
+            float z = centerZ + rightZ * cornerX * half;
+            float u = glyphU + (cornerX + 1.0F) * HALF_UV * glyphWidth;
+            float v = (cornerY + 1.0F) * HALF_UV;
+            buffer.addVertex(pose.pose(), x, y, z)
                     .setColor(tint)
                     .setUv(u, v)
                     .setOverlay(OverlayTexture.NO_OVERLAY)
                     .setLight(RUNE_LIGHT)
-                    .setNormal(pose, 0.0F, 0.0F, 1.0F);
+                    .setNormal(pose, outX, 0.0F, outZ);
         }
-        poseStack.popPose();
     }
 
     private static void box(

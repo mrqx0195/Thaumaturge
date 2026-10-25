@@ -19,6 +19,7 @@ final class JadeConfig {
     static final ResourceLocation SMELTERS = option("smelters");
     static final ResourceLocation ADVANCED_ALCHEMICAL_FURNACES = option("advanced_alchemical_furnaces");
     static final ResourceLocation JARS = option("jars");
+    static final ResourceLocation BRAIN_JARS = option("brain_jars");
     static final ResourceLocation ALEMBICS = option("alembics");
     static final ResourceLocation CRUCIBLES = option("crucibles");
     static final ResourceLocation TUBES = option("tubes");
@@ -39,6 +40,8 @@ final class JadeConfig {
     static final ResourceLocation FLUX_SCRUBBERS = option("flux_scrubbers");
     static final ResourceLocation CRYSTALIZERS = option("crystalizers");
     static final ResourceLocation RESERVOIRS = option("reservoirs");
+    static final ResourceLocation MIRRORS = option("mirrors");
+    static final ResourceLocation ESSENTIA_MIRRORS = option("essentia_mirrors");
 
     private static final List<ResourceLocation> OPTIONS = List.of(
             NODES,
@@ -48,6 +51,7 @@ final class JadeConfig {
             SMELTERS,
             ADVANCED_ALCHEMICAL_FURNACES,
             JARS,
+            BRAIN_JARS,
             ALEMBICS,
             CRUCIBLES,
             TUBES,
@@ -67,7 +71,9 @@ final class JadeConfig {
             FOCAL_MANIPULATORS,
             FLUX_SCRUBBERS,
             CRYSTALIZERS,
-            RESERVOIRS);
+            RESERVOIRS,
+            MIRRORS,
+            ESSENTIA_MIRRORS);
 
     private JadeConfig() {}
 
@@ -81,6 +87,14 @@ final class JadeConfig {
 
     static boolean shouldShow(IPluginConfig config, ResourceLocation option, Accessor<?> accessor) {
         return config.get(CATEGORY) && config.<DisplayMode>getEnum(option).shouldShow(accessor);
+    }
+
+    static boolean shouldShowNodes(DisplayMode mode, boolean wearsRevealingGear, boolean holdingThaumometer) {
+        return switch (mode) {
+            case OFF -> false;
+            case ON -> true;
+            case GOGGLES -> wearsRevealingGear || holdingThaumometer;
+        };
     }
 
     static ResourceLocation option(String name) {

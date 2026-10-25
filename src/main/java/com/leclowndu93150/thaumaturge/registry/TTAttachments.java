@@ -8,6 +8,7 @@ import com.leclowndu93150.thaumaturge.content.eldritch.encounter.LabyrinthBindin
 import com.leclowndu93150.thaumaturge.content.eldritch.portal.TransitState;
 import com.leclowndu93150.thaumaturge.content.entity.trait.MobTraitRuntime;
 import com.leclowndu93150.thaumaturge.content.entity.trait.MobTraitState;
+import com.leclowndu93150.thaumaturge.content.equipment.DestructiveSwingMemory;
 import com.leclowndu93150.thaumaturge.content.equipment.runic.RunicShieldState;
 import com.leclowndu93150.thaumaturge.content.golem.seals.SealWorldIndex;
 import com.leclowndu93150.thaumaturge.content.golem.seals.SealsChunkData;
@@ -102,6 +103,11 @@ public final class TTAttachments {
 
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Integer>> GRAPPLE_ID =
             register("grapple_id", () -> AttachmentType.builder(() -> -1).build());
+
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<DestructiveSwingMemory>> DESTRUCTIVE_SWING =
+            register(
+                    "destructive_swing",
+                    () -> AttachmentType.builder(DestructiveSwingMemory::new).build());
 
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Boolean>> DONATOR_CAPE = register(
             "donator_cape",
@@ -227,6 +233,9 @@ public final class TTAttachments {
                     () -> AttachmentType.builder(PhysicalFluxSamples::new).build());
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Boolean>> TAINT_LEGACY_IMPORTED = register(
             "taint_legacy_imported",
+            () -> AttachmentType.builder(() -> false).serialize(Codec.BOOL).build());
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<Boolean>> LEGACY_TAINT_SPIDERLING = register(
+            "legacy_taint_spiderling",
             () -> AttachmentType.builder(() -> false).serialize(Codec.BOOL).build());
 
     private TTAttachments() {}

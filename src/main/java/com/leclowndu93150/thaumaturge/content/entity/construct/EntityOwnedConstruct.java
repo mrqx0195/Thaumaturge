@@ -18,12 +18,14 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.PlayerTeam;
 import org.jspecify.annotations.Nullable;
 
@@ -33,8 +35,17 @@ public abstract class EntityOwnedConstruct extends PathfinderMob implements Owna
     private static final String MASTER_KEY = "Owner";
     private static final String COMMISSIONED_KEY = "v";
     private static final int CHATTER_INTERVAL = 240;
+    private static final float JOLT_YAW_SCALE = 45.0F;
+    private static final float JOLT_PITCH_SCALE = 20.0F;
 
     private boolean commissioned;
+
+    static Vec3 dampHorizontalMovement(MoverType type, Vec3 movement, double divisor) {
+        if (type != MoverType.SELF) {
+            return movement;
+        }
+        return new Vec3(movement.x / divisor, movement.y, movement.z / divisor);
+    }
 
     protected EntityOwnedConstruct(EntityType<? extends EntityOwnedConstruct> type, Level level) {
         super(type, level);
@@ -85,6 +96,28 @@ public abstract class EntityOwnedConstruct extends PathfinderMob implements Owna
         if (!commissioned && !level().isClientSide()) {
             discard();
         }
+    }
+
+    final void jolt() {
+        setXRot(perturb(getXRot(), JOLT_PITCH_SCALE));
+        setYHeadRot(perturb(getYHeadRot(), JOLT_YAW_SCALE));
+        swivelWithHead();
+    }
+
+    final void swivelWithHead() {
+        float yaw = getYHeadRot();
+        setYRot(yaw);
+        setYBodyRot(yaw);
+    }
+
+    final void regenerate(int interval, float amount) {
+        if (tickCount % interval == 0 && getHealth() < getMaxHealth()) {
+            heal(amount);
+        }
+    }
+
+    private float perturb(float angle, float scale) {
+        return angle + (float) random.nextGaussian() * scale;
     }
 
     @Override

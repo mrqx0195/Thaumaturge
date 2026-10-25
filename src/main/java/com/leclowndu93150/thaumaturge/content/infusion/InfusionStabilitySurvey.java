@@ -2,8 +2,10 @@ package com.leclowndu93150.thaumaturge.content.infusion;
 
 import com.leclowndu93150.thaumaturge.api.infusion.AltarStabiliser;
 import com.leclowndu93150.thaumaturge.registry.TTBlockTags;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
@@ -25,6 +27,7 @@ public final class InfusionStabilitySurvey {
     public static Result survey(Level level, BlockPos matrix) {
         Set<BlockPos> settled = new HashSet<>();
         Map<Block, Integer> ranks = new HashMap<>();
+        List<BlockPos> problems = new ArrayList<>();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         float total = 0.0F;
         for (int dx = -HALF_WIDTH; dx <= HALF_WIDTH; dx++) {
@@ -41,11 +44,11 @@ public final class InfusionStabilitySurvey {
                     BlockPos mirror = new BlockPos(matrix.getX() - dx, pos.getY(), matrix.getZ() - dz);
                     settled.add(pos);
                     settled.add(mirror);
-                    total += scorePair(level, pos, mirror, ranks);
+                    total += scorePair(level, pos, mirror, ranks, problems);
                 }
             }
         }
-        return new Result(total);
+        return new Result(total, problems);
     }
 
     public static boolean isStabiliser(Level level, BlockPos pos) {
@@ -57,13 +60,16 @@ public final class InfusionStabilitySurvey {
                 || state.getBlock() instanceof AltarStabiliser behaviour && behaviour.stabilisesNow(level, pos);
     }
 
-    private static float scorePair(Level level, BlockPos pos, BlockPos mirror, Map<Block, Integer> ranks) {
+    private static float scorePair(
+            Level level, BlockPos pos, BlockPos mirror, Map<Block, Integer> ranks, List<BlockPos> problems) {
         Profile near = profile(level, pos);
         Profile far = profile(level, mirror);
-        if (near.identity() != far.identity() || near.amount() != far.amount()) {
+        if (!far.stabiliser() || near.identity() != far.identity() || near.amount() != far.amount()) {
+            problems.add(pos);
             return -Math.max(near.amount(), far.amount());
         }
         if (penalised(level, near, pos, mirror) || penalised(level, far, mirror, pos)) {
+            problems.add(pos);
             return -Math.max(penaltyOf(level, near, pos), penaltyOf(level, far, mirror));
         }
         int rank = ranks.merge(near.identity(), 1, Integer::sum) - 1;
@@ -82,13 +88,15 @@ public final class InfusionStabilitySurvey {
 
     private static Profile profile(Level level, BlockPos pos) {
         if (!level.hasChunkAt(pos)) {
-            return new Profile(Blocks.AIR, AltarStabiliser.STANDARD_PAIR_VALUE, null);
+            return new Profile(Blocks.AIR, AltarStabiliser.STANDARD_PAIR_VALUE, false, null);
         }
         Block block = level.getBlockState(pos).getBlock();
-        if (block instanceof AltarStabiliser behaviour) {
-            return new Profile(normalise(behaviour.countsAs(level, pos)), behaviour.pairValue(level, pos), behaviour);
+        boolean stabiliser = isStabiliser(level, pos);
+        if (stabiliser && block instanceof AltarStabiliser behaviour) {
+            return new Profile(
+                    normalise(behaviour.countsAs(level, pos)), behaviour.pairValue(level, pos), true, behaviour);
         }
-        return new Profile(normalise(block), AltarStabiliser.STANDARD_PAIR_VALUE, null);
+        return new Profile(normalise(block), AltarStabiliser.STANDARD_PAIR_VALUE, stabiliser, null);
     }
 
     private static Block normalise(Block block) {
@@ -96,7 +104,18 @@ public final class InfusionStabilitySurvey {
     }
 
     private record Profile(
-            Block identity, float amount, @Nullable AltarStabiliser behaviour) {}
+            Block identity,
+            float amount,
+            boolean stabiliser,
+            @Nullable AltarStabiliser behaviour) {}
 
-    public record Result(float stabilityReplenish) {}
+    public record Result(float stabilityReplenish, List<BlockPos> problemBlocks) {
+        public Result {
+            problemBlocks = List.copyOf(problemBlocks);
+        }
+
+        public Result(float stabilityReplenish) {
+            this(stabilityReplenish, List.of());
+        }
+    }
 }

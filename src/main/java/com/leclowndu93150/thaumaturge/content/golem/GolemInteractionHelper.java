@@ -41,28 +41,42 @@ public final class GolemInteractionHelper {
                 Thaumaturge.LOGGER.error("Golem left-click at {} failed", pos, e);
             }
         } else {
-            if (player.getMainHandItem().getItem() instanceof BlockItem
-                    && !serverLevel.noCollision(null, new AABB(pos))) {
+            if (shouldMoveForPlacement(
+                    player.getMainHandItem(), pos, face, golem.asEntity().getBoundingBox())) {
                 golem.asEntity()
                         .setPos(
                                 golem.asEntity().getX() + face.getStepX(),
                                 golem.asEntity().getY() + face.getStepY(),
                                 golem.asEntity().getZ() + face.getStepZ());
+                player.moveTo(
+                        golem.asEntity().getX(),
+                        golem.asEntity().getY(),
+                        golem.asEntity().getZ(),
+                        golem.asEntity().getYRot(),
+                        golem.asEntity().getXRot());
             }
             try {
-                BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), face, pos, false);
+                BlockHitResult hit = new BlockHitResult(hitLocation(pos, face), face, pos, false);
                 player.gameMode.useItemOn(
                         player, serverLevel, player.getMainHandItem(), InteractionHand.MAIN_HAND, hit);
             } catch (Exception e) {
                 Thaumaturge.LOGGER.error("Golem right-click at {} failed", pos, e);
             }
         }
-        golem.addRankXp(1);
+        golem.grantRankExperience(1);
         if (!player.getMainHandItem().isEmpty() && player.getMainHandItem().getCount() <= 0) {
             player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         }
         returnItems(player, golem);
-        golem.swingArm();
+        golem.animateSwing();
+    }
+
+    static boolean shouldMoveForPlacement(ItemStack stack, BlockPos pos, Direction face, AABB golemBounds) {
+        return stack.getItem() instanceof BlockItem && new AABB(pos.relative(face)).intersects(golemBounds);
+    }
+
+    static Vec3 hitLocation(BlockPos pos, Direction face) {
+        return Vec3.atCenterOf(pos).relative(face, 0.5D);
     }
 
     private static void returnItems(FakePlayer player, IGolemAPI golem) {
@@ -76,7 +90,7 @@ public final class GolemInteractionHelper {
                 stack = golem.hands().hold(stack);
             }
             if (!stack.isEmpty()) {
-                InvHelper.dropItemAtEntity(golem.level(), stack, golem.asEntity());
+                InvHelper.dropAt(golem.level(), stack, golem.asEntity());
             }
             inventory.setItem(slot, ItemStack.EMPTY);
         }

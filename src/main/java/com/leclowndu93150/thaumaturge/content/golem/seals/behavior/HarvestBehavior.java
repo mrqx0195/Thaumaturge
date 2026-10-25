@@ -1,5 +1,6 @@
 package com.leclowndu93150.thaumaturge.content.golem.seals.behavior;
 
+import com.leclowndu93150.thaumaturge.Thaumaturge;
 import com.leclowndu93150.thaumaturge.api.golems.GolemDispatch;
 import com.leclowndu93150.thaumaturge.api.golems.IGolemAPI;
 import com.leclowndu93150.thaumaturge.api.golems.seals.ISealBehavior;
@@ -13,21 +14,21 @@ import com.leclowndu93150.thaumaturge.content.golem.GolemInteractionHelper;
 import com.leclowndu93150.thaumaturge.content.golem.tasks.TaskBoard;
 import com.leclowndu93150.thaumaturge.server.TTFakePlayer;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.FarmBlock;
+import net.minecraft.world.level.block.LevelEvent;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -36,21 +37,29 @@ import net.neoforged.neoforge.common.util.FakePlayer;
 import org.jspecify.annotations.Nullable;
 
 public final class HarvestBehavior implements ISealBehavior {
-    public static final SealSetting REPLANT = new SealSetting("prep", "gui.thaumaturge.seal.setting.replant", true);
+    public static final SealSetting REPLANT =
+            new SealSetting("replant_crops", "gui.thaumaturge.seal.setting.replant", true).readingAlso("prep");
     public static final SealSetting REQUEST_SEEDS =
-            new SealSetting("ppro", "gui.thaumaturge.seal.setting.provision", false);
-    public static final MapCodec<HarvestBehavior> CODEC = ReplantSite.CODEC
-            .listOf()
-            .optionalFieldOf("replant", List.of())
-            .xmap(HarvestBehavior::new, behavior -> List.copyOf(behavior.sites.values()));
+            new SealSetting("request_seeds", "gui.thaumaturge.seal.setting.provision", false).readingAlso("ppro");
+    private static final String SITES_KEY = "replant_sites";
+    private static final String LEGACY_SITES_KEY = "replant";
+    public static final MapCodec<HarvestBehavior> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                    ReplantSite.CODEC.listOf().optionalFieldOf(SITES_KEY).forGetter(HarvestBehavior::storedSites),
+                    ReplantSite.LEGACY_CODEC
+                            .listOf()
+                            .lenientOptionalFieldOf(LEGACY_SITES_KEY)
+                            .forGetter(behavior -> Optional.empty()))
+            .apply(instance, HarvestBehavior::restore));
 
-    private static final int STAGGER = 33;
+    private static final int HARVEST_JOB = 0;
+    static final int REPLANT_JOB = 1;
+    private static final int STAGGER = 41;
     private static final int SCAN_PERIOD = 5;
     private static final int TIDY_PERIOD = 100;
-    private static final int BREAK_EFFECT = 2001;
     private static final int REPLANT_LIFESPAN = 300;
 
     private final SealClock clock = new SealClock(STAGGER);
+    private final TaskLedger<BlockPos> harvests = new TaskLedger<>();
     private final Map<Long, ReplantSite> sites = new HashMap<>();
     private int cursor;
 
@@ -60,17 +69,29 @@ public final class HarvestBehavior implements ISealBehavior {
         saved.forEach(site -> sites.put(site.pos().asLong(), site));
     }
 
+    private static HarvestBehavior restore(Optional<List<ReplantSite>> current, Optional<List<ReplantSite>> legacy) {
+        return new HarvestBehavior(current.or(() -> legacy).orElse(List.of()));
+    }
+
+    private Optional<List<ReplantSite>> storedSites() {
+        return sites.isEmpty() ? Optional.empty() : Optional.of(List.copyOf(sites.values()));
+    }
+
     @Override
     public void tick(ServerLevel level, ISealEntity seal) {
-        if (clock.at(TIDY_PERIOD)) {
+        int now = clock.advance();
+        if (now % TIDY_PERIOD == 0) {
+            harvests.dropFinished(level);
             forgetSitesOutside(level, SealArea.bounds(seal));
         }
-        if (clock.advance() % SCAN_PERIOD != 0) {
+        if (now % SCAN_PERIOD != 0) {
             return;
         }
         BlockPos cell = SealArea.cell(seal, cursor++);
         if (CropUtils.isGrownCrop(level, cell)) {
-            post(level, seal, cell);
+            if (!harvests.tracks(cell)) {
+                post(level, seal, cell.immutable(), HARVEST_JOB);
+            }
             return;
         }
         ReplantSite site = sites.get(cell.asLong());
@@ -78,7 +99,7 @@ public final class HarvestBehavior implements ISealBehavior {
                 && site != null
                 && level.getBlockState(cell).isAir()
                 && !TaskBoard.of(level).isLive(site.taskId())) {
-            site.assign(post(level, seal, site.pos()).id());
+            site.assign(post(level, seal, site.pos(), REPLANT_JOB).id());
         }
     }
 
@@ -95,75 +116,80 @@ public final class HarvestBehavior implements ISealBehavior {
         });
     }
 
-    private static Task post(ServerLevel level, ISealEntity seal, BlockPos pos) {
+    private Task post(ServerLevel level, ISealEntity seal, BlockPos pos, int job) {
         Task task = Task.atBlock(seal.pos(), pos);
         task.setPriority(seal.priority());
+        task.setData(job);
         GolemDispatch.postTask(level, task);
+        if (job == HARVEST_JOB) {
+            harvests.record(task, pos);
+        }
         return task;
     }
 
     @Override
     public boolean completeTask(ServerLevel level, ISealEntity seal, IGolemAPI golem, Task task) {
-        if (CropUtils.isGrownCrop(level, task.pos())) {
-            reap(level, seal, golem, task);
-        } else {
+        ReplantSite site = siteFor(task);
+        if (isReplantTask(task, site)) {
             replant(level, golem, task);
+        } else {
+            reap(level, seal, golem, task);
+            harvests.forget(task);
         }
         task.end();
         return true;
     }
 
-    private void reap(ServerLevel level, ISealEntity seal, IGolemAPI golem, Task task) {
-        BlockPos pos = task.pos();
-        FakePlayer hand = TTFakePlayer.GOLEM.at(level, golem.asEntity());
-        BlockState crop = level.getBlockState(pos);
-        if (CropUtils.isClickableCrop(crop)) {
-            Vec3 toward = Vec3.atCenterOf(pos).subtract(golem.asEntity().position());
-            crop.useWithoutItem(
-                    level,
-                    hand,
-                    new BlockHitResult(
-                            Vec3.atCenterOf(pos),
-                            Direction.getNearest(toward.x, toward.y, toward.z).getOpposite(),
-                            pos,
-                            false));
-            golem.addRankXp(1);
-            golem.swingArm();
-            return;
-        }
-        GolemInteractionHelper.golemClick(level, golem, pos, seal.pos().face(), ItemStack.EMPTY, false, true);
-        if (!CropUtils.isGrownCrop(level, pos)) {
-            return;
-        }
-        ItemStack seed = CropUtils.getSeed(level, pos, crop);
-        BlockBreakerEngine.harvestBlock(level, hand, pos, false, 0);
-        golem.addRankXp(1);
-        golem.swingArm();
-        if (!seal.setting(REPLANT) || seed.isEmpty()) {
-            return;
-        }
-        Direction plantFace = plantingFace(crop, level.getBlockState(pos.below()));
-        if (plantFace != null) {
-            Task replant = Task.atBlock(seal.pos(), pos);
-            replant.setPriority(task.priority());
-            replant.setLife(REPLANT_LIFESPAN);
-            GolemDispatch.postTask(level, replant);
-            ReplantSite site = new ReplantSite(
-                    pos,
-                    plantFace,
-                    seed.copy(),
-                    level.getBlockState(pos.below()).getBlock() instanceof FarmBlock);
-            site.assign(replant.id());
-            sites.put(pos.asLong(), site);
+    static boolean isReplantTask(Task task, @Nullable ReplantSite site) {
+        return task.data() == REPLANT_JOB || site != null && site.taskId() == task.id();
+    }
+
+    private @Nullable ReplantSite siteFor(Task task) {
+        ReplantSite site = sites.get(task.pos().asLong());
+        return site != null && site.taskId() == task.id() ? site : null;
+    }
+
+    @Override
+    public void onTaskSuspended(ServerLevel level, ISealEntity seal, Task task) {
+        harvests.forget(task);
+        ReplantSite site = siteFor(task);
+        if (site != null && isReplantTask(task, site)) {
+            site.assign(0);
         }
     }
 
-    private static @Nullable Direction plantingFace(BlockState crop, BlockState soil) {
-        boolean cocoa = crop.getBlock() instanceof CocoaBlock;
-        if (!cocoa && soil.is(BlockTags.DIRT) || soil.getBlock() instanceof FarmBlock) {
-            return Direction.DOWN;
+    private void reap(ServerLevel level, ISealEntity seal, IGolemAPI golem, Task task) {
+        BlockPos pos = task.pos();
+        BlockState crop = level.getBlockState(pos);
+        if (CropUtils.isClickableCrop(crop)) {
+            GolemInteractionHelper.golemClick(level, golem, pos, Direction.UP, ItemStack.EMPTY, false, false);
+            return;
         }
-        return cocoa ? crop.getValue(CocoaBlock.FACING) : null;
+        FakePlayer hand = TTFakePlayer.GOLEM.at(level, golem.asEntity());
+        ItemStack seed = CropUtils.getSeed(level, pos, crop);
+        Direction support = CropUtils.plantingSupport(crop).orElse(null);
+        boolean tilled = level.getBlockState(pos.below()).getBlock() instanceof FarmBlock;
+        GolemInteractionHelper.golemClick(level, golem, pos, Direction.UP, ItemStack.EMPTY, false, false);
+        if (!CropUtils.isGrownCrop(level, pos)) {
+            return;
+        }
+        BlockBreakerEngine.harvestBlock(level, hand, pos, false, 0);
+        golem.grantRankExperience(1);
+        golem.animateSwing();
+        if (!seal.setting(REPLANT)
+                || seed.isEmpty()
+                || support == null
+                || !level.getBlockState(pos).isAir()) {
+            return;
+        }
+        Task replant = Task.atBlock(seal.pos(), pos);
+        replant.setPriority(task.priority());
+        replant.setLife(REPLANT_LIFESPAN);
+        replant.setData(REPLANT_JOB);
+        GolemDispatch.postTask(level, replant);
+        ReplantSite site = new ReplantSite(pos, support, seed.copyWithCount(1), support == Direction.DOWN && tilled);
+        site.assign(replant.id());
+        sites.put(pos.asLong(), site);
     }
 
     private void replant(ServerLevel level, IGolemAPI golem, Task task) {
@@ -176,39 +202,83 @@ public final class HarvestBehavior implements ISealBehavior {
             return;
         }
         FakePlayer hand = TTFakePlayer.GOLEM.at(level, golem.asEntity());
-        BlockState soil = level.getBlockState(pos.below());
-        if (site.tilled() && soil.is(BlockTags.DIRT) && !(soil.getBlock() instanceof FarmBlock)) {
-            useOn(
-                    hand,
-                    new ItemStack(Items.DIAMOND_HOE),
-                    new BlockHitResult(Vec3.atCenterOf(pos.below()), Direction.UP, pos.below(), false));
+        Direction support = supportOf(level, site);
+        BlockPos ground = pos.relative(support);
+        if (site.tilled() && support == Direction.DOWN && !isFarmland(level.getBlockState(ground))) {
+            till(level, hand, ground);
         }
         ItemStack seed = site.seed().copyWithCount(1);
-        BlockPos support = pos.relative(site.face());
-        if (useOn(
-                        hand,
-                        seed.copy(),
-                        new BlockHitResult(Vec3.atCenterOf(support), site.face().getOpposite(), support, false))
-                .consumesAction()) {
-            level.levelEvent(BREAK_EFFECT, pos, Block.getId(level.getBlockState(pos)));
-            golem.hands().release(seed);
-            golem.addRankXp(1);
-            golem.swingArm();
+        InteractionResult result = plant(level, golem, seed, ground, support);
+        if (result == InteractionResult.SUCCESS && !level.getBlockState(pos).isAir()) {
+            level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, pos, Block.getId(level.getBlockState(pos)));
+            golem.hands().release(site.seed().copyWithCount(1));
+            golem.grantRankExperience(1);
+            golem.animateSwing();
         }
     }
 
-    private static InteractionResult useOn(FakePlayer hand, ItemStack tool, BlockHitResult hit) {
-        hand.setItemInHand(InteractionHand.MAIN_HAND, tool);
-        InteractionResult result = tool.useOn(new UseOnContext(hand, InteractionHand.MAIN_HAND, hit));
-        hand.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-        return result;
+    private static InteractionResult plant(
+            ServerLevel level, IGolemAPI golem, ItemStack seed, BlockPos ground, Direction support) {
+        FakePlayer player = TTFakePlayer.GOLEM.at(level, golem.asEntity());
+        try {
+            player.setItemInHand(InteractionHand.MAIN_HAND, seed);
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(ground), support.getOpposite(), ground, false);
+            return player.gameMode.useItemOn(player, level, seed, InteractionHand.MAIN_HAND, hit);
+        } finally {
+            player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        }
+    }
+
+    private static Direction supportOf(ServerLevel level, ReplantSite site) {
+        Direction stored = site.face();
+        if (stored.getAxis().isVertical()) {
+            return Direction.DOWN;
+        }
+        BlockPos pos = site.pos();
+        boolean storedSideEmpty = level.getBlockState(pos.relative(stored)).isAir();
+        boolean oppositeSideEmpty =
+                level.getBlockState(pos.relative(stored.getOpposite())).isAir();
+        return resolveSupport(stored, storedSideEmpty, oppositeSideEmpty);
+    }
+
+    static Direction resolveSupport(Direction stored, boolean storedSideEmpty, boolean oppositeSideEmpty) {
+        if (stored.getAxis().isVertical()) {
+            return Direction.DOWN;
+        }
+        return storedSideEmpty && !oppositeSideEmpty ? stored.getOpposite() : stored;
+    }
+
+    private static void till(ServerLevel level, FakePlayer player, BlockPos ground) {
+        ItemStack hoe = new ItemStack(Items.WOODEN_HOE);
+        try {
+            player.setItemInHand(InteractionHand.MAIN_HAND, hoe);
+            Vec3 hit = Vec3.atCenterOf(ground).relative(Direction.UP, 0.5);
+            player.gameMode.useItemOn(
+                    player,
+                    level,
+                    hoe,
+                    InteractionHand.MAIN_HAND,
+                    new BlockHitResult(hit, Direction.UP, ground, false));
+        } catch (RuntimeException e) {
+            Thaumaturge.LOGGER.error("Golem could not till {}", ground, e);
+        } finally {
+            player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        }
+    }
+
+    private static boolean isFarmland(BlockState state) {
+        return state.getBlock() instanceof FarmBlock;
     }
 
     @Override
     public boolean canPerform(ISealEntity seal, IGolemAPI golem, Task task) {
-        ReplantSite site = sites.get(task.pos().asLong());
-        if (site == null || site.taskId() != task.id()) {
+        ReplantSite site = siteFor(task);
+        if (!isReplantTask(task, site)) {
             return true;
+        }
+        if (site == null) {
+            task.end();
+            return false;
         }
         boolean holdingSeed = golem.hands().holds(site.seed());
         if (!holdingSeed && seal.setting(REQUEST_SEEDS)) {

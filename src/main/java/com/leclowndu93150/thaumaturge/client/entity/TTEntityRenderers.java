@@ -38,7 +38,15 @@ import com.leclowndu93150.thaumaturge.registry.TTEntities;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.renderer.entity.ChickenRenderer;
+import net.minecraft.client.renderer.entity.CowRenderer;
+import net.minecraft.client.renderer.entity.CreeperRenderer;
 import net.minecraft.client.renderer.entity.ItemEntityRenderer;
+import net.minecraft.client.renderer.entity.PigRenderer;
+import net.minecraft.client.renderer.entity.SheepRenderer;
+import net.minecraft.client.renderer.entity.SpiderRenderer;
+import net.minecraft.client.renderer.entity.ThrownItemRenderer;
+import net.minecraft.client.renderer.entity.VillagerRenderer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -104,6 +112,13 @@ public final class TTEntityRenderers {
 
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_SPIDER.get(), SpiderRenderer::new);
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_CREEPER.get(), CreeperRenderer::new);
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_COW.get(), CowRenderer::new);
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_PIG.get(), PigRenderer::new);
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_CHICKEN.get(), ChickenRenderer::new);
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_SHEEP.get(), SheepRenderer::new);
+        event.registerEntityRenderer(TTEntities.LEGACY_TAINT_VILLAGER.get(), VillagerRenderer::new);
         event.registerEntityRenderer(TTEntities.WISP.get(), WispRenderer::new);
         event.registerEntityRenderer(TTEntities.FLUX_RIFT.get(), FluxRiftRenderer::new);
         event.registerEntityRenderer(TTEntities.CAUSALITY_COLLAPSER.get(), NoModelRenderer::new);
@@ -136,7 +151,7 @@ public final class TTEntityRenderers {
         event.registerEntityRenderer(TTEntities.BOTTLE_TAINT.get(), BottleTaintRenderer::new);
         event.registerEntityRenderer(TTEntities.SPECIAL_ITEM.get(), SpecialItemRenderer::new);
         event.registerEntityRenderer(TTEntities.FOLLOWING_ITEM.get(), ItemEntityRenderer::new);
-        event.registerEntityRenderer(TTEntities.ALUMENTUM.get(), EmptyEntityRenderer::new);
+        event.registerEntityRenderer(TTEntities.ALUMENTUM.get(), ThrownItemRenderer::new);
         event.registerEntityRenderer(TTEntities.THAUMATURGE_GOLEM.get(), GolemRenderer::new);
         event.registerEntityRenderer(TTEntities.GOLEM_DART.get(), GolemDartRenderer::new);
         event.registerEntityRenderer(TTEntities.PECH.get(), PechRenderer::new);

@@ -35,7 +35,9 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseRailBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
@@ -55,9 +57,10 @@ public class EntityArcaneBore extends EntityOwnedConstruct implements ArcaneBore
     private static final int DIG_VISUAL_GRACE_TICKS = 4;
     private static final double EJECT_DISTANCE = 0.75;
     private static final float DISMANTLE_DROP_HEIGHT = 0.5F;
-    private static final double HURT_YAW_SPREAD = 45.0;
-    private static final double HURT_PITCH_SPREAD = 20.0;
     private static final double KNOCKBACK_CLAMP = 0.1;
+    private static final double OWNER_NEAR_RANGE = 2.0;
+    private static final double OWNER_ABOVE_RANGE = 2.0;
+    private static final double BLOCK_CENTER = 0.5;
 
     private final ArcaneBoreCore core = new ArcaneBoreCore();
 
@@ -67,6 +70,7 @@ public class EntityArcaneBore extends EntityOwnedConstruct implements ArcaneBore
 
     public EntityArcaneBore(EntityType<? extends EntityArcaneBore> type, Level level) {
         super(type, level);
+        this.lookControl = new ConstructLookControl(this);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -86,26 +90,39 @@ public class EntityArcaneBore extends EntityOwnedConstruct implements ArcaneBore
         if (!(level() instanceof ServerLevel serverLevel)) {
             return;
         }
-        yBodyRot = yHeadRot;
-        if (tickCount % HEAL_INTERVAL == 0) {
-            heal(1.0F);
+        swivelWithHead();
+        regenerate(HEAL_INTERVAL, 1.0F);
+        if (!followRailSignal(serverLevel) && shouldFollowBlockSignal(isOnPlainRail(serverLevel), isPassenger())) {
+            followBlockBelow(serverLevel);
         }
-        updateActiveFromRedstone();
         core.serverTick(this, serverLevel, tickCount);
     }
 
-    private void updateActiveFromRedstone() {
+    private boolean followRailSignal(ServerLevel level) {
         BlockPos pos = new BlockPos(Mth.floor(getX()), Mth.floor(getY()), Mth.floor(getZ()));
-        BlockState state = level().getBlockState(pos);
+        BlockState state = level.getBlockState(pos);
         if (!state.is(TTBlocks.ACTIVATOR_RAIL.get())) {
             pos = pos.below();
-            state = level().getBlockState(pos);
+            state = level.getBlockState(pos);
         }
-        if (state.is(TTBlocks.ACTIVATOR_RAIL.get())) {
-            setActive(!state.getValue(BlockStateProperties.POWERED));
-        } else if (!isPassenger()) {
-            setActive(level().hasNeighborSignal(blockPosition().below()));
+        if (!state.is(TTBlocks.ACTIVATOR_RAIL.get())) {
+            return false;
         }
+        setActive(!state.getValue(BlockStateProperties.POWERED));
+        return true;
+    }
+
+    private boolean isOnPlainRail(ServerLevel level) {
+        BlockPos pos = blockPosition();
+        return BaseRailBlock.isRail(level, pos) || BaseRailBlock.isRail(level, pos.below());
+    }
+
+    private void followBlockBelow(ServerLevel level) {
+        setActive(level.hasNeighborSignal(blockPosition().below()));
+    }
+
+    static boolean shouldFollowBlockSignal(boolean onRail, boolean passenger) {
+        return !onRail && !passenger;
     }
 
     @Override
@@ -233,15 +250,14 @@ public class EntityArcaneBore extends EntityOwnedConstruct implements ArcaneBore
     public boolean hurt(DamageSource source, float amount) {
         if (!(level() instanceof ServerLevel level)) return false;
         if (source.getEntity() instanceof LivingEntity living && isOwner(living)) {
-            Direction face =
-                    Direction.getNearest(living.getX() - getX(), living.getY() - getY(), living.getZ() - getZ());
+            Direction face = placementFacing(
+                    blockPosition(), living.getX(), living.getZ(), living.getEyeY(), living.getDirection());
             if (face != Direction.DOWN) {
                 setFacing(face);
             }
             return false;
         }
-        setYRot((float) (getYRot() + random.nextGaussian() * HURT_YAW_SPREAD));
-        setXRot((float) (getXRot() + random.nextGaussian() * HURT_PITCH_SPREAD));
+        jolt();
         return super.hurt(source, amount);
     }
 
@@ -267,19 +283,38 @@ public class EntityArcaneBore extends EntityOwnedConstruct implements ArcaneBore
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
-        if (!level().isClientSide() && isOwner(player) && isAlive()) {
-            if (player.isShiftKeyDown()) {
-                playSound(TTSounds.ZAP.get(), 1.0F, 1.0F);
-                dropHeld();
-                spawnAtLocation(new ItemStack(TTItems.ARCANE_BORE.get()), DISMANTLE_DROP_HEIGHT);
-                discard();
-                player.swing(hand);
-            } else {
-                MenuArcaneBore.open(player, this);
-            }
+        if (isRemoved() || !isOwner(player) || player.getItemInHand(hand).is(Items.NAME_TAG)) {
+            return super.mobInteract(player, hand);
+        }
+        if (level().isClientSide()) {
             return InteractionResult.SUCCESS;
         }
-        return super.mobInteract(player, hand);
+        if (player.isShiftKeyDown()) {
+            playSound(TTSounds.ZAP.get(), 1.0F, 1.0F);
+            dropHeld();
+            spawnAtLocation(new ItemStack(TTItems.ARCANE_BORE.get()), DISMANTLE_DROP_HEIGHT);
+            discard();
+            player.swing(hand);
+        } else {
+            MenuArcaneBore.open(player, this);
+        }
+        return InteractionResult.SUCCESS;
+    }
+
+    static Direction placementFacing(
+            BlockPos pos, double ownerX, double ownerZ, double ownerEyeY, Direction ownerFacing) {
+        boolean near = Math.abs(ownerX - (pos.getX() + BLOCK_CENTER)) < OWNER_NEAR_RANGE
+                && Math.abs(ownerZ - (pos.getZ() + BLOCK_CENTER)) < OWNER_NEAR_RANGE;
+        if (near) {
+            double rise = ownerEyeY - pos.getY();
+            if (rise > OWNER_ABOVE_RANGE) {
+                return Direction.UP;
+            }
+            if (rise < 0.0) {
+                return Direction.DOWN;
+            }
+        }
+        return ownerFacing.getOpposite();
     }
 
     @Override
@@ -293,7 +328,7 @@ public class EntityArcaneBore extends EntityOwnedConstruct implements ArcaneBore
 
     @Override
     public void move(MoverType type, Vec3 movement) {
-        super.move(type, new Vec3(movement.x / MOVE_DAMPING, movement.y, movement.z / MOVE_DAMPING));
+        super.move(type, dampHorizontalMovement(type, movement, MOVE_DAMPING));
     }
 
     public boolean isActive() {

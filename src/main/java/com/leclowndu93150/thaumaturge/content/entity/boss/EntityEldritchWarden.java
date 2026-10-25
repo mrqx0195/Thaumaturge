@@ -275,9 +275,10 @@ public class EntityEldritchWarden extends EntityThaumaturgeBoss implements Range
         level().addFreshEntity(orb);
     }
 
-    private void screech(LivingEntity target) {
+    void screech(LivingEntity target) {
         float bearing = getYRot() * Mth.DEG_TO_RAD;
         target.push(-Mth.sin(bearing) * SCREECH_FLING, FLING_RISE, Mth.cos(bearing) * SCREECH_FLING);
+        target.hurtMarked = true;
         target.addEffect(new MobEffectInstance(MobEffects.WITHER, SCREECH_TICKS, 0));
         target.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, SCREECH_TICKS, 0));
         if (target instanceof ServerPlayer player) {
@@ -320,6 +321,7 @@ public class EntityEldritchWarden extends EntityThaumaturgeBoss implements Range
         HolderLookup.Provider registries = registryAccess();
         super.addAdditionalSaveData(output);
         output.putByte(BossTitles.SAVE_KEY, (byte) title);
+        frenzy.addAdditionalSaveData(output);
     }
 
     @Override
@@ -327,5 +329,6 @@ public class EntityEldritchWarden extends EntityThaumaturgeBoss implements Range
         HolderLookup.Provider registries = registryAccess();
         super.readAdditionalSaveData(input);
         title = TITLES.clamp((input.contains(BossTitles.SAVE_KEY) ? input.getByte(BossTitles.SAVE_KEY) : (byte) 0));
+        frenzy.readAdditionalSaveData(input);
     }
 }

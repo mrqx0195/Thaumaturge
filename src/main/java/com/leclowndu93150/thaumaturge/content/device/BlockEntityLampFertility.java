@@ -33,7 +33,7 @@ public final class BlockEntityLampFertility extends BlockEntity implements Essen
     private final EssentiaIntake intake =
             new EssentiaIntake(this, TTAspects.DESIDERIUM, INTAKE_SUCTION, INTAKE_INTERVAL);
     private int charges;
-    private int runningTicks;
+    private int pairingCooldown;
 
     public BlockEntityLampFertility(BlockPos pos, BlockState state) {
         super(TTBlockEntities.LAMP_FERTILITY.get(), pos, state);
@@ -44,10 +44,10 @@ public final class BlockEntityLampFertility extends BlockEntity implements Essen
         boolean running = !level.hasNeighborSignal(pos) && lamp.charges >= MIN_RUNNING_CHARGES;
         BlockLamp.showLit(level, pos, state, running);
         if (!running) {
-            lamp.runningTicks = 0;
             return;
         }
-        if (lamp.runningTicks++ % PAIRING_INTERVAL == 0) {
+        if (--lamp.pairingCooldown <= 0) {
+            lamp.pairingCooldown = PAIRING_INTERVAL;
             lamp.pairAnimals(level, pos);
         }
     }

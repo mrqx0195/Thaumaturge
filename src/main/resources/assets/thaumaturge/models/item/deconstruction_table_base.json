@@ -1,5 +1,5 @@
 {
-  "parent": "thaumaturge:item/bewlr_block",
+  "parent": "thaumaturge:item/special_block_item_base",
   "textures": {
     "particle": "minecraft:block/oak_planks"
   }

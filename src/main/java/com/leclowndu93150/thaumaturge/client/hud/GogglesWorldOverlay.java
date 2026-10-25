@@ -10,6 +10,7 @@ import com.leclowndu93150.thaumaturge.api.essentia.IAspectQuery;
 import com.leclowndu93150.thaumaturge.api.items.GogglesAccess;
 import com.leclowndu93150.thaumaturge.client.render.aspect.AspectTagWorldRenderer;
 import com.leclowndu93150.thaumaturge.content.aura.node.BlockEntityNode;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJar;
 import com.leclowndu93150.thaumaturge.content.infusion.BlockEntityInfusionMatrix;
 import com.leclowndu93150.thaumaturge.content.research.scan.ScanNode;
 import com.leclowndu93150.thaumaturge.registry.TTItems;
@@ -34,6 +35,7 @@ public final class GogglesWorldOverlay {
     private static final float TAG_SCALE_CAP = 0.5F;
     private static final double TAG_SCALE_GROW_TICKS = 10.0D;
     private static final float SPACE_ABOVE_LIFT = 0.4F;
+    private static final float JAR_READOUT_LIFT = 0.25F;
     private static final float TAG_ALPHA = 0.75F;
 
     private static @Nullable BlockPos lastTarget;
@@ -83,7 +85,20 @@ public final class GogglesWorldOverlay {
         boolean spaceAbove = mc.level.getBlockState(pos.above()).isAir();
         Direction dir = spaceAbove ? Direction.UP : mc.player.getDirection().getOpposite();
         double y = pos.getY() + (spaceAbove ? SPACE_ABOVE_LIFT : 0.0F);
-        drawTags(event.getPoseStack(), mc, pos.getX(), y, pos.getZ(), aspects, dir, scale, readout.showAmounts());
+        if (be instanceof BlockEntityJar && dir == Direction.UP) {
+            y += JAR_READOUT_LIFT - scale * 2.0F;
+        }
+        drawTags(
+                event.getPoseStack(),
+                mc,
+                pos.getX(),
+                y,
+                pos.getZ(),
+                aspects,
+                dir,
+                scale,
+                readout.showAmounts(),
+                be instanceof BlockEntityJar ? scale * 0.4F : 0.0F);
     }
 
     static AspectReadout readAspects(Level level, @Nullable BlockEntity blockEntity, BlockPos pos, Direction side) {
@@ -129,8 +144,9 @@ public final class GogglesWorldOverlay {
             AspectList aspects,
             Direction dir,
             float scale,
-            boolean showAmounts) {
+            boolean showAmounts,
+            float iconOffsetY) {
         AspectTagWorldRenderer.renderTagCloud(
-                poseStack, mc, x, y, z, aspects, dir, scale, TAG_ALPHA, aspect -> true, showAmounts);
+                poseStack, mc, x, y, z, aspects, dir, scale, TAG_ALPHA, aspect -> true, showAmounts, iconOffsetY);
     }
 }

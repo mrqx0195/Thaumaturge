@@ -10,6 +10,7 @@ import com.leclowndu93150.thaumaturge.api.golems.seals.SealPos;
 import com.leclowndu93150.thaumaturge.api.golems.seals.SealSetting;
 import com.leclowndu93150.thaumaturge.api.golems.tasks.Task;
 import com.leclowndu93150.thaumaturge.api.items.InvHelper;
+import com.leclowndu93150.thaumaturge.api.items.ItemMatch;
 import com.leclowndu93150.thaumaturge.content.golem.seals.SealAccess;
 import java.util.List;
 import java.util.Optional;
@@ -26,8 +27,9 @@ import org.jspecify.annotations.Nullable;
 
 public final class ProvideBehavior implements ISealBehavior {
     public static final SealSetting SINGLE_ITEM =
-            new SealSetting("psing", "gui.thaumaturge.seal.setting.single", false);
-    public static final SealSetting LEAVE_ONE = new SealSetting("pleave", "gui.thaumaturge.seal.setting.leave", false);
+            new SealSetting("single_item", "gui.thaumaturge.seal.setting.single", false).readingAlso("psing");
+    public static final SealSetting LEAVE_ONE =
+            new SealSetting("leave_one", "gui.thaumaturge.seal.setting.leave", false).readingAlso("pleave");
 
     private static final int CLOCK_SPREAD = 88;
     private static final int SCAN_PERIOD = 20;
@@ -49,9 +51,8 @@ public final class ProvideBehavior implements ISealBehavior {
         if (filter.isEmpty()) {
             return true;
         }
-        InvHelper.InvFilter matching = ItemMatchSettings.of(seal);
-        boolean listed = filter.get().stacks().stream()
-                .anyMatch(slot -> !slot.isEmpty() && InvHelper.areItemStacksEqual(slot, stack, matching));
+        ItemMatch matching = ItemMatchSettings.of(seal);
+        boolean listed = filter.get().stacks().stream().anyMatch(slot -> !slot.isEmpty() && matching.test(slot, stack));
         return filter.get().isBlacklist() != listed;
     }
 
@@ -86,7 +87,7 @@ public final class ProvideBehavior implements ISealBehavior {
 
     private static void scan(ServerLevel level, ISealEntity seal) {
         SealPos at = seal.pos();
-        IItemHandler store = InvHelper.getItemHandlerAt(level, at.pos(), at.face());
+        IItemHandler store = InvHelper.handlerAt(level, at.pos(), at.face());
         if (store == null) {
             return;
         }
@@ -101,8 +102,7 @@ public final class ProvideBehavior implements ISealBehavior {
             if (destination == null
                     || destination.distSqr(at.pos()) >= SERVICE_RANGE * SERVICE_RANGE
                     || !supplies(seal, request.wanted())
-                    || InvHelper.countTotalItemsIn(store, request.wanted(), InvHelper.InvFilter.STRICT)
-                            < minimumStock) {
+                    || InvHelper.count(store, request.wanted(), ItemMatch.EXACT) < minimumStock) {
                 continue;
             }
             ISealEntity requester = request.requestingSeal();
@@ -141,7 +141,7 @@ public final class ProvideBehavior implements ISealBehavior {
             return false;
         }
         ItemStack wanted = request.wanted();
-        if (task.data() != LEG_COLLECT) {
+        if (legOf(task.data()) != LEG_COLLECT) {
             return golem.hands().holds(wanted);
         }
         return SealAccess.allows(request.requestingSeal(), golem)
@@ -153,26 +153,30 @@ public final class ProvideBehavior implements ISealBehavior {
     public boolean completeTask(ServerLevel level, ISealEntity seal, IGolemAPI golem, Task task) {
         SupplyOrder request = task.servedOrder();
         if (request != null) {
-            if (task.data() == LEG_COLLECT) {
+            if (legOf(task.data()) == LEG_COLLECT) {
                 collect(level, seal, golem, task, request);
             } else {
-                deliver(level, golem, request);
+                deliver(level, seal, golem, request);
             }
         }
         task.end();
         return true;
     }
 
+    static int legOf(int data) {
+        return data >= LEG_COLLECT && data <= LEG_TO_BLOCK ? data : LEG_COLLECT;
+    }
+
     private static void collect(ServerLevel level, ISealEntity seal, IGolemAPI golem, Task task, SupplyOrder request) {
         SealPos at = seal.pos();
-        IItemHandler store = InvHelper.getItemHandlerAt(level, at.pos(), at.face());
+        IItemHandler store = InvHelper.handlerAt(level, at.pos(), at.face());
         if (store == null) {
             return;
         }
         ItemStack wanted = request.wanted();
         int amount = seal.setting(SINGLE_ITEM) ? 1 : wanted.getCount();
         if (seal.setting(LEAVE_ONE)) {
-            int stocked = InvHelper.countTotalItemsIn(store, wanted, InvHelper.InvFilter.STRICT);
+            int stocked = InvHelper.count(store, wanted, ItemMatch.EXACT);
             if (stocked <= amount) {
                 amount = stocked - 1;
             }
@@ -181,8 +185,7 @@ public final class ProvideBehavior implements ISealBehavior {
         if (amount <= 0) {
             return;
         }
-        ItemStack taken =
-                InvHelper.removeStackFrom(store, wanted.copyWithCount(amount), InvHelper.InvFilter.STRICT, false);
+        ItemStack taken = InvHelper.extract(store, wanted.copyWithCount(amount), ItemMatch.EXACT, false);
         if (taken.isEmpty()) {
             return;
         }
@@ -191,8 +194,8 @@ public final class ProvideBehavior implements ISealBehavior {
             dropToward(level, at.pos(), at.face(), spill);
         }
         HandlingSound.play(golem, HandlingSound.HIGH);
-        golem.addRankXp(1);
-        golem.swingArm();
+        golem.grantRankExperience(1);
+        golem.animateSwing();
         if (request.requestingSeal() != null) {
             return;
         }
@@ -204,38 +207,45 @@ public final class ProvideBehavior implements ISealBehavior {
         post(level, delivery, request);
     }
 
-    private static void deliver(ServerLevel level, IGolemAPI golem, SupplyOrder request) {
+    private static void deliver(ServerLevel level, ISealEntity seal, IGolemAPI golem, SupplyOrder request) {
         ItemStack wanted = request.wanted();
         ItemStack given = golem.hands().release(wanted);
         int shortfall = wanted.getCount() - given.getCount();
         Entity receiver = request.recipient();
+        BlockPos destination = request.destinationBlock();
+        Direction face = request.destinationFace();
         if (shortfall > 0) {
             if (receiver != null) {
                 GolemDispatch.orderSupply(level, receiver, wanted.copyWithCount(shortfall));
-            } else if (request.destinationBlock() != null && request.destinationFace() != null) {
-                GolemDispatch.orderSupply(
-                        level, request.destinationBlock(), request.destinationFace(), wanted.copyWithCount(shortfall));
+            } else if (destination != null && face != null) {
+                GolemDispatch.orderSupply(level, destination, face, wanted.copyWithCount(shortfall));
             }
         }
         if (!given.isEmpty()) {
-            if (receiver != null) {
+            if (!hasDeliveryTarget(receiver, destination, face)) {
+                ItemStack spill = golem.hands().hold(given);
+                if (!spill.isEmpty()) {
+                    SealPos provider = seal.pos();
+                    dropToward(level, provider.pos(), provider.face(), spill);
+                }
+            } else if (receiver != null) {
                 level.addFreshEntity(new ItemEntity(
                         level,
                         receiver.getX(),
                         receiver.getY() + receiver.getEyeHeight() * HALF,
                         receiver.getZ(),
                         given));
-            } else if (request.destinationBlock() != null && request.destinationFace() != null) {
-                handOver(level, golem, request.destinationBlock(), request.destinationFace(), given);
+            } else if (destination != null && face != null) {
+                handOver(level, golem, destination, face, given);
             }
         }
         HandlingSound.play(golem, HandlingSound.LOW);
-        golem.swingArm();
+        golem.animateSwing();
         request.markSpent();
     }
 
     private static void handOver(ServerLevel level, IGolemAPI golem, BlockPos pos, Direction side, ItemStack stack) {
-        IItemHandler inventory = InvHelper.getItemHandlerAt(level, pos, side);
+        IItemHandler inventory = InvHelper.handlerAt(level, pos, side);
         if (inventory == null) {
             dropToward(level, pos, side, stack);
             return;
@@ -253,6 +263,11 @@ public final class ProvideBehavior implements ISealBehavior {
         item.setDeltaMovement(
                 Vec3.atLowerCornerOf(face.getOpposite().getNormal()).scale(DROP_PUSH));
         level.addFreshEntity(item);
+    }
+
+    static boolean hasDeliveryTarget(
+            @Nullable Entity receiver, @Nullable BlockPos destination, @Nullable Direction face) {
+        return receiver != null || destination != null && face != null;
     }
 
     @Override

@@ -45,6 +45,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.EventHooks;
 import org.jspecify.annotations.Nullable;
 
 public class EntityEldritchGolem extends EntityThaumaturgeBoss implements RangedAttackMob {
@@ -171,8 +172,17 @@ public class EntityEldritchGolem extends EntityThaumaturgeBoss implements Ranged
             }
             return;
         }
-        if (stomping && underfoot.getBlock() instanceof BlockLoot) {
-            level().destroyBlock(feet, true);
+        if (!EventHooks.canEntityGrief((ServerLevel) level(), this)) {
+            return;
+        }
+        if (stomping) {
+            if (underfoot.getBlock() instanceof BlockLoot) {
+                level().destroyBlock(feet, true, this);
+            }
+            BlockPos belowFeet = feet.below();
+            if (level().getBlockState(belowFeet).getBlock() instanceof BlockLoot) {
+                level().destroyBlock(belowFeet, true, this);
+            }
             underfoot = level().getBlockState(feet);
         }
         float hardness = underfoot.getDestroySpeed(level(), feet);
@@ -195,11 +205,27 @@ public class EntityEldritchGolem extends EntityThaumaturgeBoss implements Ranged
     @Override
     public boolean hurt(DamageSource source, float damage) {
         if (!(level() instanceof ServerLevel level)) return false;
-        if (!isHeadless() && damage > getHealth() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+        if (isFatalUnblockedHit(
+                isHeadless(),
+                isAlive(),
+                damage,
+                getHealth(),
+                source.is(DamageTypeTags.BYPASSES_INVULNERABILITY),
+                isInvulnerableTo(source))) {
             loseHead(level);
             return false;
         }
         return super.hurt(source, damage);
+    }
+
+    static boolean isFatalUnblockedHit(
+            boolean headless,
+            boolean alive,
+            float damage,
+            float health,
+            boolean bypassesInvulnerability,
+            boolean invulnerable) {
+        return !headless && alive && damage > health && !bypassesInvulnerability && !invulnerable;
     }
 
     private void loseHead(ServerLevel level) {
@@ -243,6 +269,7 @@ public class EntityEldritchGolem extends EntityThaumaturgeBoss implements Ranged
                 float bearing = getYRot() * Mth.DEG_TO_RAD;
                 target.push(-Mth.sin(bearing) * HEADLESS_FLING, FLING_RISE, Mth.cos(bearing) * HEADLESS_FLING);
             }
+            target.hurtMarked = true;
         }
         return landed;
     }

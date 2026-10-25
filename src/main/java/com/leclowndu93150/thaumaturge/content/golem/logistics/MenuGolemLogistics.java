@@ -7,14 +7,16 @@ import com.leclowndu93150.thaumaturge.content.golem.seals.SealHandler;
 import com.leclowndu93150.thaumaturge.content.golem.seals.behavior.ProvideBehavior;
 import com.leclowndu93150.thaumaturge.registry.TTMenus;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -42,10 +44,11 @@ public final class MenuGolemLogistics extends AbstractContainerMenu {
     private static final char KEY_SEPARATOR = '|';
     private static final int MAX_REQUEST_STACKS = 16;
 
-    private final SimpleContainer display = new SimpleContainer(SIZE);
+    private final DisplayContainer display = new DisplayContainer();
     private final List<ItemStack> items = new ArrayList<>();
     private final List<ItemStack> stock = new ArrayList<>();
     private long collectedAt = Long.MIN_VALUE;
+    private boolean collected;
     private final Player player;
     private final @Nullable LogisticsTarget target;
     private final DataSlot start = DataSlot.standalone();
@@ -144,15 +147,29 @@ public final class MenuGolemLogistics extends AbstractContainerMenu {
     }
 
     private int lastPage() {
-        return Math.max(0, items.size() / COLUMNS - (ROWS - 1));
+        return lastPageForItemCount(items.size());
+    }
+
+    static int lastPageForItemCount(int itemCount) {
+        return Math.max(0, Math.ceilDiv(itemCount, COLUMNS) - ROWS);
+    }
+
+    static int clampPage(int page, int itemCount) {
+        return Math.min(Math.max(page, 0), lastPageForItemCount(itemCount));
+    }
+
+    static boolean shouldCollectStock(boolean hasCollected, long now, long collectedAt) {
+        return !hasCollected || now - collectedAt >= COLLECT_INTERVAL_TICKS;
     }
 
     private void refresh(boolean full) {
-        if (full
-                && player.level() instanceof ServerLevel level
-                && level.getGameTime() - collectedAt >= COLLECT_INTERVAL_TICKS) {
-            collect(level);
-            collectedAt = level.getGameTime();
+        if (full && player.level() instanceof ServerLevel level) {
+            long now = level.getGameTime();
+            if (shouldCollectStock(collected, now, collectedAt)) {
+                collect(level);
+                collectedAt = now;
+                collected = true;
+            }
         }
         if (full) {
             String filter = searchText.toLowerCase(Locale.ROOT);
@@ -162,7 +179,9 @@ public final class MenuGolemLogistics extends AbstractContainerMenu {
                     items.add(stack);
                 }
             }
+            sortByDisplayName(items);
         }
+        start.set(clampPage(start.get(), items.size()));
         display.clearContent();
         int skipped = 0;
         int slot = 0;
@@ -184,8 +203,8 @@ public final class MenuGolemLogistics extends AbstractContainerMenu {
                     || !player.getUUID().equals(seal.owner())) {
                 continue;
             }
-            IItemHandler handler = InvHelper.getItemHandlerAt(
-                    level, seal.pos().pos(), seal.pos().face());
+            IItemHandler handler =
+                    InvHelper.handlerAt(level, seal.pos().pos(), seal.pos().face());
             if (handler == null) {
                 continue;
             }
@@ -214,6 +233,10 @@ public final class MenuGolemLogistics extends AbstractContainerMenu {
                 || stack.getHoverName().getString().toLowerCase(Locale.ROOT).contains(filter);
     }
 
+    static void sortByDisplayName(List<ItemStack> stacks) {
+        stacks.sort(Comparator.comparing(stack -> stack.getHoverName().getString(), String.CASE_INSENSITIVE_ORDER));
+    }
+
     private static ItemStack sum(ItemStack existing, ItemStack addition) {
         return existing.copyWithCount(existing.getCount() + addition.getCount());
     }
@@ -237,8 +260,65 @@ public final class MenuGolemLogistics extends AbstractContainerMenu {
         return clicker == player;
     }
 
+    static final class DisplayContainer implements Container {
+        private final NonNullList<ItemStack> items = NonNullList.withSize(SIZE, ItemStack.EMPTY);
+
+        @Override
+        public int getContainerSize() {
+            return SIZE;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            for (ItemStack stack : items) {
+                if (!stack.isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public ItemStack getItem(int slot) {
+            return items.get(slot);
+        }
+
+        @Override
+        public ItemStack removeItem(int slot, int amount) {
+            return ItemStack.EMPTY;
+        }
+
+        @Override
+        public ItemStack removeItemNoUpdate(int slot) {
+            return ItemStack.EMPTY;
+        }
+
+        @Override
+        public void setItem(int slot, ItemStack stack) {
+            items.set(slot, stack);
+        }
+
+        @Override
+        public int getMaxStackSize() {
+            return Integer.MAX_VALUE;
+        }
+
+        @Override
+        public void setChanged() {}
+
+        @Override
+        public boolean stillValid(Player player) {
+            return true;
+        }
+
+        @Override
+        public void clearContent() {
+            items.replaceAll(ignored -> ItemStack.EMPTY);
+        }
+    }
+
     private static final class DisplaySlot extends Slot {
-        private DisplaySlot(SimpleContainer container, int index, int x, int y) {
+        private DisplaySlot(Container container, int index, int x, int y) {
             super(container, index, x, y);
         }
 

@@ -8,7 +8,6 @@ import com.leclowndu93150.thaumaturge.api.aura.AuraHelper;
 import com.leclowndu93150.thaumaturge.api.crucible.CrucibleEvent;
 import com.leclowndu93150.thaumaturge.content.aspect.ReadOnlyAspectContainer;
 import com.leclowndu93150.thaumaturge.content.blockentity.AbstractSyncedBlockEntity;
-import com.leclowndu93150.thaumaturge.content.effect.Effects;
 import com.leclowndu93150.thaumaturge.content.entity.EntitySpecialItem;
 import com.leclowndu93150.thaumaturge.content.recipe.ThaumaturgeCraftingManager;
 import com.leclowndu93150.thaumaturge.content.recipe.crucible.CrucibleRecipe;
@@ -18,22 +17,20 @@ import com.leclowndu93150.thaumaturge.registry.TTBlockEntities;
 import com.leclowndu93150.thaumaturge.registry.TTBlockTags;
 import com.leclowndu93150.thaumaturge.registry.TTSounds;
 import com.leclowndu93150.thaumaturge.serialization.TTNbt;
-import java.awt.*;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -44,6 +41,20 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
 
     public static final int TANK_CAPACITY = 1000;
     public static final int MAX_ASPECT = 100;
+    private static final int BOIL_HEAT = 150;
+
+    private static final int LEAK_THRESHOLD = 100;
+    private static final int LEAK_DELAY_AFTER_DISSOLVE = 250;
+    private static final int LEAK_DELAY_AFTER_CRAFT = 350;
+    private static final int DISSOLVE_LEAK_RESET = LEAK_THRESHOLD - LEAK_DELAY_AFTER_DISSOLVE;
+    private static final int CRAFT_LEAK_RESET = LEAK_THRESHOLD - LEAK_DELAY_AFTER_CRAFT;
+    private static final int OVERFLOW_INTERVAL = 5;
+
+    private static final float SURFACE_FLOOR = 0.3F;
+    private static final float SURFACE_WATER_RISE = 0.5F;
+    private static final float SURFACE_OVERFULL = 1.001F;
+    private static final float SURFACE_EXACT_FULL = 0.9999F;
+    private static final float SURFACE_RIM = 1.0F;
 
     private final FluidTank tank = new FluidTank(TANK_CAPACITY) {
         @Override
@@ -55,7 +66,7 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
     };
     private AspectList aspects = AspectList.EMPTY;
     private short heat = 0;
-    private long counter = -100;
+    private int leakCounter = -LEAK_THRESHOLD;
 
     // FX Infos
     int prevcolor = 0;
@@ -70,7 +81,6 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
 
     private void tick() {
         if (level == null) return;
-        counter++;
         int prevHeat = heat;
         if (!level.isClientSide()) {
             if (tank.getFluidAmount() > 0) {
@@ -79,27 +89,30 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
                 if (!hasHeatBelow) {
                     if (heat > 0) {
                         heat--;
-                        if (heat == 149) {
-                            setChanged();
-                            syncToClient();
-                        }
                     }
                 } else if (heat < 200) {
                     heat++;
-                    if (prevHeat < 151 && heat >= 151) {
-                        setChanged();
-                        syncToClient();
-                    }
                 }
             } else if (heat > 0) {
                 heat--;
             }
 
-            if (aspects.totalAmount() > MAX_ASPECT && counter % 5L == 0L) spillOverflow();
+            if (boilingStateChanged(prevHeat, heat, tank.getFluidAmount())) {
+                setChanged();
+                syncToClient();
+            } else if (heat != prevHeat && (heat == 0 || heat == 200)) {
+                setChanged();
+            }
 
-            if (counter >= 100L) {
-                spillRandom();
-                counter = 0L;
+            ServerLevel serverLevel = (ServerLevel) level;
+            if (aspects.totalAmount() > MAX_ASPECT && serverLevel.getGameTime() % OVERFLOW_INTERVAL == 0L) {
+                spillOverflow();
+            }
+
+            leakCounter++;
+            if (leakCounter >= LEAK_THRESHOLD) {
+                leakCounter = 0;
+                if (!aspects.isEmpty()) spillRandom();
             }
 
             if (tank.getFluidAmount() > 0) {
@@ -115,83 +128,11 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
     private void sendEffects() {
         if (level == null || level.isClientSide()) return;
         ServerLevel level = (ServerLevel) this.level;
+        float surface = getFluidHeight();
         if (this.heat > 150) {
-            Effects.crucibleFroth(
-                            level,
-                            new Vec3(
-                                    getBlockPos().getX()
-                                            + 0.2F
-                                            + level.getRandom().nextFloat() * 0.6F,
-                                    getBlockPos().getY() + getFluidHeight(),
-                                    getBlockPos().getZ()
-                                            + 0.2F
-                                            + level.getRandom().nextFloat() * 0.6F))
-                    .send();
-            if (this.aspects.totalAmount() > MAX_ASPECT) {
-                for (int a = 0; a < 2; a++) {
-                    Effects.crucibleFrothDown(
-                                    level,
-                                    new Vec3(
-                                            getBlockPos().getX(),
-                                            getBlockPos().getY() + 1,
-                                            getBlockPos().getZ()
-                                                    + level.getRandom().nextFloat()))
-                            .send();
-                    Effects.crucibleFrothDown(
-                                    level,
-                                    new Vec3(
-                                            getBlockPos().getX() + 1,
-                                            getBlockPos().getY() + 1,
-                                            getBlockPos().getZ()
-                                                    + level.getRandom().nextFloat()))
-                            .send();
-                    Effects.crucibleFrothDown(
-                                    level,
-                                    new Vec3(
-                                            getBlockPos().getX()
-                                                    + level.getRandom().nextFloat(),
-                                            getBlockPos().getY() + 1,
-                                            getBlockPos().getZ()))
-                            .send();
-                    Effects.crucibleFrothDown(
-                                    level,
-                                    new Vec3(
-                                            getBlockPos().getX()
-                                                    + level.getRandom().nextFloat(),
-                                            getBlockPos().getY() + 1,
-                                            getBlockPos().getZ() + 1))
-                            .send();
-                }
-            }
+            CrucibleFx.froth(level, getBlockPos(), surface, this.aspects.totalAmount() > MAX_ASPECT);
         }
-
-        if (level.getRandom().nextInt(6) == 0 && !this.aspects.isEmpty()) {
-            int color = this.aspects
-                            .entries()
-                            .get(level.getRandom().nextInt(aspects.size()))
-                            .aspect()
-                            .value()
-                            .color()
-                    + -16777216;
-            int x = 5 + level.getRandom().nextInt(22);
-            int y = 5 + level.getRandom().nextInt(22);
-            this.delay = level.getRandom().nextInt(10);
-            this.prevcolor = color;
-            this.prevx = x;
-            this.prevy = y;
-            Color c = new Color(color);
-            float r = c.getRed() / 255.0F;
-            float g = c.getGreen() / 255.0F;
-            float b = c.getBlue() / 255.0F;
-            Effects.crucibleBubble(
-                            level,
-                            new Vec3(
-                                    getBlockPos().getX() + x / 32.0F + 1 / 64F,
-                                    getBlockPos().getY() + 0.05F + getFluidHeight(),
-                                    getBlockPos().getZ() + y / 32.0F + 1 / 64F))
-                    .color(r, g, b)
-                    .send();
-        }
+        CrucibleFx.bubble(level, getBlockPos(), surface, aspects);
     }
 
     @Override
@@ -241,17 +182,28 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
     }
 
     public float getFluidHeight() {
-        float base = 0.3F + 0.5F * ((float) this.tank.getFluidAmount() / TANK_CAPACITY);
-        float out = base + (float) this.aspects.totalAmount() / MAX_ASPECT * (1.0F - base);
-        if (out > 1.0F) {
-            out = 1.001F;
-        }
+        return fluidSurfaceHeight(tank.getFluidAmount(), aspects.totalAmount());
+    }
 
-        if (out == 1.0F) {
-            out = 0.9999F;
-        }
+    static float fluidSurfaceHeight(int waterAmount, int aspectAmount) {
+        if (aspectAmount > MAX_ASPECT) return SURFACE_OVERFULL;
+        float water = (float) waterAmount / TANK_CAPACITY;
+        float essentia = (float) aspectAmount / MAX_ASPECT;
+        float waterSurface = SURFACE_FLOOR + water * SURFACE_WATER_RISE;
+        float surface = waterSurface + essentia * (SURFACE_RIM - waterSurface);
+        return aspectAmount == MAX_ASPECT || surface >= SURFACE_RIM ? SURFACE_EXACT_FULL : surface;
+    }
 
-        return out;
+    boolean isBoiling() {
+        return isBoiling(heat, tank.getFluidAmount());
+    }
+
+    static boolean isBoiling(int heat, int waterAmount) {
+        return heat > BOIL_HEAT && waterAmount > 0;
+    }
+
+    static boolean boilingStateChanged(int previousHeat, int currentHeat, int waterAmount) {
+        return isBoiling(previousHeat, waterAmount) != isBoiling(currentHeat, waterAmount);
     }
 
     public void spillRemnants() {
@@ -305,15 +257,19 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
                     .get(level.getRandom().nextInt(aspects.size()))
                     .aspect();
             aspects = aspects.reduce(randAspect, 1);
-            // Slow neglect should first look like a leak. Only an actual physical leak adds a
-            // very small Aura consequence; blocked leak attempts do not become free Flux.
-            if (level.getRandom().nextInt(4) != 0
-                    && PhysicalFlux.spill((ServerLevel) level, getBlockPos(), level.getRandom())) {
+            // Boiling leaks vent physical Flux; cold neglect only pollutes the local aura.
+            if (ventsPhysicalFlux(heat)) {
+                PhysicalFlux.spill((ServerLevel) level, getBlockPos(), level.getRandom());
+            } else {
                 AuraHelper.polluteAura(level, getBlockPos(), 0.25F, true);
             }
         }
         setChanged();
         syncToClient();
+    }
+
+    static boolean ventsPhysicalFlux(int heat) {
+        return heat > BOIL_HEAT;
     }
 
     public short getHeat() {
@@ -338,11 +294,7 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
                     1.0F,
                     false);
             if (!level.isClientSide()) {
-                Effects.bamf((ServerLevel) level, Vec3.atCenterOf(getBlockPos()).add(0F, 0.75F, 0F))
-                        .withSound()
-                        .fancy()
-                        .side(Direction.UP)
-                        .send();
+                CrucibleFx.craftComplete((ServerLevel) level, getBlockPos());
             }
             return true;
         } else if (event != 2) {
@@ -358,31 +310,7 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
                     1.0F,
                     false);
             if (!level.isClientSide()) {
-                for (int q = 0; q < 10; q++) {
-                    Color color;
-                    if (aspects.isEmpty()) {
-                        color = new Color(1.0F, 1.0F, 1.0F);
-                    } else {
-                        color = new Color(aspects.entries()
-                                .get(level.getRandom().nextInt(aspects.size()))
-                                .aspect()
-                                .value()
-                                .color());
-                    }
-                    Effects.crucibleBoil(
-                                    (ServerLevel) level,
-                                    new Vec3(
-                                            getBlockPos().getX()
-                                                    + 0.2F
-                                                    - level.getRandom().nextFloat() * 0.6F,
-                                            getBlockPos().getY() + 0.1F + getFluidHeight(),
-                                            getBlockPos().getZ()
-                                                    + 0.2F
-                                                    - level.getRandom().nextFloat() * 0.6F))
-                            .heat(data)
-                            .color(color.getRed() / 255f, color.getGreen() / 255F, color.getBlue() / 255F)
-                            .send();
-                }
+                CrucibleFx.boilBurst((ServerLevel) level, getBlockPos(), getFluidHeight(), aspects, data);
             }
             return true;
         }
@@ -455,7 +383,7 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
                         owner, getBlockPos(), getBlockState(), this, out.copy(), recipe.aspects()));
                 craftDone = true;
                 count--;
-                this.counter = -250L;
+                this.leakCounter = CRAFT_LEAK_RESET;
             } else {
                 AspectList aspects = AspectIndexAccess.index().of(stack);
                 CrucibleEvent.Dissolve event =
@@ -468,7 +396,7 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
                     }
                     bubble = true;
                     count--;
-                    this.counter = -150L;
+                    this.leakCounter = DISSOLVE_LEAK_RESET;
                 }
             }
         }
@@ -499,15 +427,24 @@ public class BlockEntityCrucible extends AbstractSyncedBlockEntity implements Re
 
     public void attemptSmelt(ItemEntity entity) {
         if (entity.level().isClientSide()) return;
-        ItemStack stack = entity.getItem();
         Entity throwerRef = entity.getOwner();
         if (!(throwerRef instanceof Player player)) return;
-        ItemStack res = attemptSmelt(stack, player);
-        if (res != null && res.getCount() > 0) {
-            stack.setCount(res.getCount());
-            entity.setItem(stack);
-        } else {
+        ItemStack stack = entity.getItem();
+        int offeredCount = thrownShare(stack.getCount());
+        if (offeredCount <= 0) return;
+        ItemStack offered = stack.copyWithCount(offeredCount);
+        ItemStack remainder = attemptSmelt(offered, player);
+        int consumed = offeredCount - (remainder == null ? 0 : remainder.getCount());
+        if (consumed <= 0) return;
+        int left = stack.getCount() - consumed;
+        if (left <= 0) {
             entity.discard();
+        } else {
+            entity.setItem(stack.copyWithCount(left));
         }
+    }
+
+    static int thrownShare(int count) {
+        return count <= 0 ? 0 : Mth.positiveCeilDiv(count, 2);
     }
 }

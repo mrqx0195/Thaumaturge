@@ -7,6 +7,7 @@ import com.leclowndu93150.thaumaturge.content.particle.BoreSparkleParticleOption
 import com.leclowndu93150.thaumaturge.content.particle.BubbleParticleOptions;
 import com.leclowndu93150.thaumaturge.content.particle.BurstParticleOptions;
 import com.leclowndu93150.thaumaturge.content.particle.CurlyWispParticleOptions;
+import com.leclowndu93150.thaumaturge.content.particle.EssentiaDropParticleOptions;
 import com.leclowndu93150.thaumaturge.content.particle.FireMoteParticleOptions;
 import com.leclowndu93150.thaumaturge.content.particle.LightningFlashParticleOptions;
 import com.leclowndu93150.thaumaturge.content.particle.ScanGlyphParticleOptions;
@@ -26,6 +27,8 @@ import com.leclowndu93150.thaumaturge.registry.TTParticles;
 import com.leclowndu93150.thaumaturge.registry.TTSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Direction.Axis;
+import net.minecraft.core.Direction.AxisDirection;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -45,6 +48,22 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public final class Effects {
     static final double DEFAULT_RADIUS = 64.0;
     private static final double BORE_DIG_RADIUS = 32.0;
+    public static final double SHELL_TICKS_PER_BLOCK = 16.0;
+    private static final double SPARKLE_SHELL_GROWTH = 0.02;
+    private static final double SPARKLE_FACE_DENSITY = 24.0;
+    private static final int SPARKLE_FACE_MINIMUM = 3;
+    private static final double SPARKLE_FACE_SPREAD = 0.45;
+    private static final int SPARKLE_DELAY_JITTER = 6;
+    private static final double SPARKLE_RISE = 0.002;
+    private static final float SPARKLE_SCALE = 0.4F;
+    private static final float SPARKLE_DECAY = 0.99F;
+    private static final int SPARKLE_BASE_AGE = 15;
+    private static final float DUST_GOLD_RED = 0.86F;
+    private static final float DUST_GOLD_GREEN = 0.58F;
+    private static final float DUST_GOLD_BLUE = 0.12F;
+    private static final float DUST_CREAM_RED = 1.0F;
+    private static final float DUST_CREAM_GREEN = 0.96F;
+    private static final float DUST_CREAM_BLUE = 0.84F;
 
     private Effects() {}
 
@@ -281,6 +300,14 @@ public final class Effects {
                 new ClientboundSpawnParticlePayload(options, x, y, z, vx, vy, vz));
     }
 
+    public static int dustSparkleColor(RandomSource random) {
+        float blend = random.nextFloat();
+        float red = Mth.lerp(blend, DUST_GOLD_RED, DUST_CREAM_RED);
+        float green = Mth.lerp(blend, DUST_GOLD_GREEN, DUST_CREAM_GREEN);
+        float blue = Mth.lerp(blend, DUST_GOLD_BLUE, DUST_CREAM_BLUE);
+        return ARGB32.colorFromFloat(1.0F, red, green, blue);
+    }
+
     public static void scanGlyph(ServerPlayer viewer, double x, double y, double z, int color, int delay) {
         float brightness = (ARGB32.red(color) + ARGB32.green(color) + ARGB32.blue(color)) / (3.0F * 255.0F);
         ScanGlyphParticleOptions options = new ScanGlyphParticleOptions(color, delay, brightness >= 0.25F);
@@ -350,59 +377,66 @@ public final class Effects {
                         pos.z,
                         TTSounds.POOF.get(),
                         SoundSource.BLOCKS,
-                        0.4F,
-                        1.0F + (float) rand.nextGaussian() * 0.05F);
+                        0.35F,
+                        1.0F + (rand.nextFloat() - rand.nextFloat()) * 0.1F);
             }
-            int puffs = 6 + rand.nextInt(3) + 2;
-            for (int a = 0; a < puffs; a++) {
-                double vx = (0.05F + rand.nextFloat() * 0.05F) * (rand.nextBoolean() ? -1 : 1);
-                double vy = (0.05F + rand.nextFloat() * 0.05F) * (rand.nextBoolean() ? -1 : 1);
-                double vz = (0.05F + rand.nextFloat() * 0.05F) * (rand.nextBoolean() ? -1 : 1);
-                if (side != null) {
-                    vx += side.getStepX() * 0.1F;
-                    vy += side.getStepY() * 0.1F;
-                    vz += side.getStepZ() * 0.1F;
-                }
-                float pr = Mth.clamp(r * (1.0F + (float) rand.nextGaussian() * 0.1F), 0.0F, 1.0F);
-                float pg = Mth.clamp(g * (1.0F + (float) rand.nextGaussian() * 0.1F), 0.0F, 1.0F);
-                float pb = Mth.clamp(b * (1.0F + (float) rand.nextGaussian() * 0.1F), 0.0F, 1.0F);
+            Vec3 sidePush =
+                    side == null ? Vec3.ZERO : new Vec3(side.getStepX(), side.getStepY(), side.getStepZ()).scale(0.12);
+            for (int a = 0; a < 10; a++) {
+                Vec3 launch = new Vec3(
+                                signedSpeed(rand, 0.04, 0.07),
+                                signedSpeed(rand, 0.04, 0.07),
+                                signedSpeed(rand, 0.04, 0.07))
+                        .add(sidePush);
+                Vec3 start = pos.add(launch.scale(1.5));
+                float pr = Mth.clamp(r + (float) (rand.nextGaussian() * 0.06), 0.0F, 1.0F);
+                float pg = Mth.clamp(g + (float) (rand.nextGaussian() * 0.06), 0.0F, 1.0F);
+                float pb = Mth.clamp(b + (float) (rand.nextGaussian() * 0.06), 0.0F, 1.0F);
+                Vec3 drift = launch.scale(0.5);
                 spawn(
                         level,
                         TTParticles.colorOf(TTParticles.PUFF, pr, pg, pb),
-                        pos.x + vx * 2.0,
-                        pos.y + vy * 2.0,
-                        pos.z + vz * 2.0,
-                        vx / 2.0,
-                        vy / 2.0,
-                        vz / 2.0);
+                        start.x,
+                        start.y,
+                        start.z,
+                        drift.x,
+                        drift.y,
+                        drift.z);
             }
             if (fancy) {
-                int motes = 2 + rand.nextInt(3);
-                for (int a = 0; a < motes; a++) {
-                    double vx = (0.025F + rand.nextFloat() * 0.025F) * (rand.nextBoolean() ? -1 : 1);
-                    double vy = (0.025F + rand.nextFloat() * 0.025F) * (rand.nextBoolean() ? -1 : 1);
-                    double vz = (0.025F + rand.nextFloat() * 0.025F) * (rand.nextBoolean() ? -1 : 1);
-                    wispyMotes(level, new Vec3(pos.x + vx * 2.0, pos.y + vy * 2.0, pos.z + vz * 2.0))
-                            .motion(vx, vy, vz)
-                            .age(15 + rand.nextInt(10))
+                for (int a = 0; a < 4; a++) {
+                    float heading = rand.nextFloat() * Mth.TWO_PI;
+                    wispyMotes(level, pos)
+                            .motion(Mth.cos(heading) * 0.025, 0.01, Mth.sin(heading) * 0.025)
+                            .age(30)
                             .randomColor()
-                            .gravity(-0.01F)
+                            .gravity(-0.012F)
                             .send();
                 }
-                spawn(level, TTParticles.colorOf(TTParticles.FLASH, 1.0F, 0.9F, 1.0F), pos.x, pos.y, pos.z);
+                spawn(level, TTParticles.colorOf(TTParticles.FLASH, 0.93F, 0.86F, 1.0F), pos.x, pos.y, pos.z);
             }
-            int wisps = (fancy ? 2 : 0) + rand.nextInt(3);
+            int wisps = rand.nextInt(fancy ? 5 : 3);
+            float wr = Mth.lerp(0.5F, r, 1.0F);
+            float wg = Mth.lerp(0.5F, g, 0.22F);
+            float wb = Mth.lerp(0.5F, b, 0.72F);
             for (int a = 0; a < wisps; a++) {
                 curlyWisp(level, pos)
-                        .color(
-                                (0.9F + rand.nextFloat() * 0.1F + r) / 2.0F,
-                                (0.1F + g) / 2.0F,
-                                (0.5F + rand.nextFloat() * 0.1F + b) / 2.0F)
-                        .alpha(0.75F)
+                        .motion(
+                                signedSpeed(rand, 0.02, 0.04),
+                                signedSpeed(rand, 0.02, 0.04),
+                                signedSpeed(rand, 0.02, 0.04))
+                        .color(wr, wg, wb)
+                        .alpha(0.65F)
+                        .scale(0.55F)
                         .side(side)
                         .seed(a)
                         .send();
             }
+        }
+
+        private static double signedSpeed(RandomSource random, double base, double spread) {
+            double speed = base + random.nextDouble() * spread;
+            return random.nextBoolean() ? -speed : speed;
         }
     }
 
@@ -759,6 +793,7 @@ public final class Effects {
         private int beamType = 0;
         private float endMod = 1.0F;
         private boolean reverse = false;
+        private boolean hit = false;
 
         BeamWand(ServerLevel level, LivingEntity source) {
             this.level = level;
@@ -795,6 +830,11 @@ public final class Effects {
             return this;
         }
 
+        public BeamWand hit(boolean hit) {
+            this.hit = hit;
+            return this;
+        }
+
         public void send() {
             if (target == null) return;
             ClientboundStreamEffectPayload payload = ClientboundStreamEffectPayload.beam(
@@ -810,7 +850,8 @@ public final class Effects {
                     endMod,
                     reverse,
                     source.getId(),
-                    false);
+                    false,
+                    hit);
             PacketDistributor.sendToPlayersNear(
                     level, null, source.getX(), source.getY(), source.getZ(), DEFAULT_RADIUS, payload);
         }
@@ -825,6 +866,7 @@ public final class Effects {
         private int beamType = 0;
         private float endMod = 1.0F;
         private boolean reverse = false;
+        private boolean hit = false;
 
         BeamBore(ServerLevel level, Vec3 source) {
             this.level = level;
@@ -861,6 +903,11 @@ public final class Effects {
             return this;
         }
 
+        public BeamBore hit(boolean hit) {
+            this.hit = hit;
+            return this;
+        }
+
         public void send() {
             if (target == null) return;
             ClientboundStreamEffectPayload payload = ClientboundStreamEffectPayload.beam(
@@ -876,7 +923,8 @@ public final class Effects {
                     endMod,
                     reverse,
                     BeamPayloadIds.NO_ENTITY,
-                    true);
+                    true,
+                    hit);
             PacketDistributor.sendToPlayersNear(level, null, source.x, source.y, source.z, DEFAULT_RADIUS, payload);
         }
     }
@@ -1388,12 +1436,7 @@ public final class Effects {
         public void send() {
             RandomSource rand = level.getRandom();
             BubbleParticleOptions options = new BubbleParticleOptions(
-                    ARGB32.colorFromFloat(1.0F, r, g, b),
-                    1.0F,
-                    rand.nextFloat() * 0.3F + 0.3F,
-                    15 + rand.nextInt(10),
-                    -0.001F,
-                    false);
+                    ARGB32.colorFromFloat(1.0F, r, g, b), 0.8F, 1.0F, 18 + rand.nextInt(5), -0.01F, false);
             spawn(level, options, pos.x, pos.y, pos.z);
         }
     }
@@ -1423,22 +1466,25 @@ public final class Effects {
 
         public void send() {
             RandomSource rand = level.getRandom();
+            float buoyancy = -0.006F * heat;
+            double kick = 0.01 * heat;
             for (int a = 0; a < 2; a++) {
+                float skew = rand.nextFloat();
                 BubbleParticleOptions options = new BubbleParticleOptions(
                         ARGB32.colorFromFloat(1.0F, r, g, b),
-                        1.0F,
-                        rand.nextFloat() * 0.3F + 0.2F,
-                        (int) (7.0 + 8.0 / (rand.nextDouble() * 0.8 + 0.2)),
-                        -0.025F * heat,
+                        0.8F,
+                        0.9F,
+                        7 + (int) (skew * skew * 24.0F),
+                        buoyancy,
                         false);
                 spawn(
                         level,
                         options,
-                        pos.x + 0.2 + rand.nextFloat() * 0.6,
+                        pos.x + (rand.nextDouble() * 2.0 - 1.0) * 0.3,
                         pos.y,
-                        pos.z + 0.2 + rand.nextFloat() * 0.6,
+                        pos.z + (rand.nextDouble() * 2.0 - 1.0) * 0.3,
                         0.0,
-                        0.002,
+                        kick,
                         0.0);
             }
         }
@@ -1455,14 +1501,9 @@ public final class Effects {
 
         public void send() {
             RandomSource rand = level.getRandom();
-            BubbleParticleOptions options = new BubbleParticleOptions(
-                    ARGB32.colorFromFloat(1.0F, 0.5F, 0.5F, 0.7F),
-                    1.0F,
-                    rand.nextFloat() * 0.2F + 0.2F,
-                    4 + rand.nextInt(3),
-                    0.1F,
-                    false);
-            spawn(level, options, pos.x, pos.y, pos.z);
+            BubbleParticleOptions options =
+                    new BubbleParticleOptions(0xFFCBC2DA, 0.7F, 0.45F, 3 + rand.nextInt(5), 0.1F, false);
+            spawn(level, options, pos.x, pos.y, pos.z, 0.0, -0.006, 0.0);
         }
     }
 
@@ -1477,13 +1518,8 @@ public final class Effects {
 
         public void send() {
             RandomSource rand = level.getRandom();
-            BubbleParticleOptions options = new BubbleParticleOptions(
-                    ARGB32.colorFromFloat(1.0F, 0.25F, 0.0F, 0.75F),
-                    0.8F,
-                    rand.nextFloat() * 0.2F + 0.4F,
-                    12 + rand.nextInt(12),
-                    0.05F,
-                    true);
+            BubbleParticleOptions options =
+                    new BubbleParticleOptions(0xFF3B2470, 0.85F, 1.3F, 10 + rand.nextInt(11), 0.35F, false);
             spawn(level, options, pos.x, pos.y, pos.z);
         }
     }
@@ -1571,28 +1607,17 @@ public final class Effects {
         }
 
         public void send() {
-            RandomSource rand = level.getRandom();
-            BubbleParticleOptions options = new BubbleParticleOptions(
-                    ARGB32.colorFromFloat(1.0F, r, g, b),
-                    alpha,
-                    0.4F + rand.nextFloat() * 0.2F,
-                    20 + rand.nextInt(10),
-                    0.01F,
-                    false);
             spawn(
                     level,
-                    options,
+                    new EssentiaDropParticleOptions(ARGB32.colorFromFloat(1.0F, r, g, b), alpha),
                     pos.x,
                     pos.y,
-                    pos.z,
-                    rand.nextGaussian() * 0.005,
-                    rand.nextGaussian() * 0.005,
-                    rand.nextGaussian() * 0.005);
+                    pos.z);
         }
     }
 
     public static final class JarSplash {
-        private static final int JAR_COLOR = 0x286176;
+        private static final int JAR_COLOR = 0x1C6E7A;
         private final ServerLevel level;
         private final Vec3 pos;
 
@@ -1603,17 +1628,17 @@ public final class Effects {
 
         public void send() {
             RandomSource rand = level.getRandom();
-            BubbleParticleOptions options = new BubbleParticleOptions(
-                    JAR_COLOR, 0.5F, 0.4F + rand.nextFloat() * 0.3F, 20 + rand.nextInt(10), 0.3F, true);
+            BubbleParticleOptions options =
+                    new BubbleParticleOptions(JAR_COLOR, 0.5F, 0.8F, 20 + rand.nextInt(11), 0.6F, true);
             spawn(
                     level,
                     options,
                     pos.x + rand.nextGaussian() * 0.075,
-                    pos.y,
+                    pos.y + rand.nextGaussian() * 0.06,
                     pos.z + rand.nextGaussian() * 0.075,
-                    rand.nextGaussian() * 0.015,
-                    0.075 + rand.nextFloat() * 0.05,
-                    rand.nextGaussian() * 0.015);
+                    rand.nextGaussian() * 0.025,
+                    0.1 + rand.nextDouble() * 0.06,
+                    rand.nextGaussian() * 0.025);
         }
     }
 
@@ -1696,51 +1721,70 @@ public final class Effects {
 
         public void send() {
             RandomSource rand = level.getRandom();
-            AABB bs = level.getBlockState(pos).getShape(level, pos).bounds().inflate(0.1);
-            int num = (int) (((bs.getXsize() + bs.getYsize() + bs.getZsize()) / 3.0) * 20.0);
-            if (num < 1) num = 1;
+            VoxelShape shape = level.getBlockState(pos).getShape(level, pos);
+            AABB shell = (shape.isEmpty() ? Shapes.block().bounds() : shape.bounds())
+                    .move(pos)
+                    .inflate(SPARKLE_SHELL_GROWTH);
             Vec3 start = source != null ? source : new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
             for (Direction face : Direction.values()) {
-                BlockPos neighbor = pos.relative(face);
-                var neighborState = level.getBlockState(neighbor);
-                if (neighborState.isSolidRender(level, neighbor)
-                        && neighborState.isFaceSturdy(level, neighbor, face.getOpposite())) continue;
-                boolean rx = face.getStepX() == 0;
-                boolean ry = face.getStepY() == 0;
-                boolean rz = face.getStepZ() == 0;
-                double mx = 0.5 + face.getStepX() * 0.51;
-                double my = 0.5 + face.getStepY() * 0.51;
-                double mz = 0.5 + face.getStepZ() * 0.51;
-                for (int a = 0; a < num * 2; a++) {
-                    double x = mx;
-                    double y = my;
-                    double z = mz;
-                    if (rx) x = mx + rand.nextGaussian() * 0.6;
-                    if (ry) y = my + rand.nextGaussian() * 0.6;
-                    if (rz) z = mz + rand.nextGaussian() * 0.6;
-                    x = Mth.clamp(x, bs.minX, bs.maxX);
-                    y = Mth.clamp(y, bs.minY, bs.maxY);
-                    z = Mth.clamp(z, bs.minZ, bs.maxZ);
-                    float r = 1.0F;
-                    float g = (189 + rand.nextInt(67)) / 255.0F;
-                    float b = (64 + rand.nextInt(192)) / 255.0F;
-                    double wx = pos.getX() + x;
-                    double wy = pos.getY() + y;
-                    double wz = pos.getZ() + z;
-                    double dist = start.distanceTo(new Vec3(wx, wy, wz));
-                    int delay = rand.nextInt(5) + (int) (dist * 16.0);
-                    float sparkScale = 0.4F + (float) rand.nextGaussian() * 0.1F;
-                    simpleSparkle(level, new Vec3(wx, wy, wz))
-                            .motion(0.0, 0.0025, 0.0)
-                            .scale(sparkScale)
-                            .color(r, g, b)
+                if (!isFaceVisible(level, pos, face)) {
+                    continue;
+                }
+                Axis normal = face.getAxis();
+                double area = 1.0;
+                for (Axis axis : Axis.values()) {
+                    if (axis != normal) {
+                        area *= shell.max(axis) - shell.min(axis);
+                    }
+                }
+                int count = Math.max(SPARKLE_FACE_MINIMUM, (int) Math.round(area * SPARKLE_FACE_DENSITY));
+                for (int index = 0; index < count; index++) {
+                    Vec3 point = pointOnFace(shell, face, rand);
+                    int delay = (int) (point.distanceTo(start) * SHELL_TICKS_PER_BLOCK)
+                            + rand.nextInt(SPARKLE_DELAY_JITTER);
+                    float blend = rand.nextFloat();
+                    float green = Mth.lerp(blend, DUST_GOLD_GREEN, DUST_CREAM_GREEN);
+                    float blue = Mth.lerp(blend, DUST_GOLD_BLUE, DUST_CREAM_BLUE);
+                    simpleSparkle(level, point)
+                            .motion(0.0, SPARKLE_RISE, 0.0)
+                            .scale(SPARKLE_SCALE)
+                            .color(Mth.lerp(blend, DUST_GOLD_RED, DUST_CREAM_RED), green, blue)
                             .delay(delay)
-                            .decay(1.0F)
-                            .gravity(0.01F)
-                            .baseAge(16)
+                            .decay(SPARKLE_DECAY)
+                            .gravity(0.0F)
+                            .baseAge(SPARKLE_BASE_AGE)
                             .send();
                 }
             }
+        }
+
+        static boolean isFaceVisible(ServerLevel level, BlockPos pos, Direction face) {
+            BlockPos neighbour = pos.relative(face);
+            if (!level.isLoaded(neighbour)) {
+                return false;
+            }
+            var state = level.getBlockState(neighbour);
+            boolean sealed =
+                    state.isSolidRender(level, neighbour) && state.isFaceSturdy(level, neighbour, face.getOpposite());
+            return !sealed;
+        }
+
+        private static Vec3 pointOnFace(AABB shell, Direction face, RandomSource random) {
+            Axis normal = face.getAxis();
+            double[] coordinates = new double[3];
+            for (Axis axis : Axis.values()) {
+                double min = shell.min(axis);
+                double max = shell.max(axis);
+                if (axis == normal) {
+                    coordinates[axis.ordinal()] = face.getAxisDirection() == AxisDirection.POSITIVE ? max : min;
+                } else {
+                    double centre = (min + max) / 2.0;
+                    double spread = (max - min) * SPARKLE_FACE_SPREAD;
+                    coordinates[axis.ordinal()] = Mth.clamp(centre + random.nextGaussian() * spread, min, max);
+                }
+            }
+            return new Vec3(
+                    coordinates[Axis.X.ordinal()], coordinates[Axis.Y.ordinal()], coordinates[Axis.Z.ordinal()]);
         }
     }
 
@@ -1754,12 +1798,11 @@ public final class Effects {
         }
 
         public void send() {
-            RandomSource rand = level.getRandom();
             spawn(level, TTParticles.PECH_CURSE.get(), pos.x, pos.y, pos.z);
             wispyMotes(level, pos)
-                    .age(10 + rand.nextInt(10))
+                    .motion(0.0, 0.01, 0.0)
                     .randomColor()
-                    .gravity(-0.01F)
+                    .gravity(-0.015F)
                     .send();
         }
     }
@@ -2008,9 +2051,9 @@ public final class Effects {
         }
 
         public void send() {
-            BubbleParticleOptions options = new BubbleParticleOptions(
-                    ARGB32.colorFromFloat(1.0F, r, g, b), 0.25F, scale, maxAge, -0.01F, false);
-            spawn(level, options, pos.x, pos.y, pos.z);
+            BubbleParticleOptions options =
+                    new BubbleParticleOptions(ARGB32.colorFromFloat(1.0F, r, g, b), 0.3F, scale, maxAge, -0.05F, false);
+            spawn(level, options, pos.x, pos.y, pos.z, 0.0, 0.012, 0.0);
         }
     }
 }

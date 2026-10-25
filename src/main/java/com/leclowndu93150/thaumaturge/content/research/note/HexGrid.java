@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
@@ -38,6 +39,9 @@ public final class HexGrid {
     }
 
     public static List<Hex> ring(int radius) {
+        if (radius <= 0) {
+            return List.of(new Hex(0, 0));
+        }
         List<Hex> result = new ArrayList<>();
         Hex hex = new Hex(NEIGHBOURS[4][0] * radius, NEIGHBOURS[4][1] * radius);
         for (int side = 0; side < 6; side++) {
@@ -60,14 +64,15 @@ public final class HexGrid {
 
     public static List<Hex> distributeRing(int radius, int entries, RandomSource random) {
         List<Hex> ring = ring(radius);
-        List<Hex> result = new ArrayList<>();
-        float spacing = ring.size() / (float) entries;
-        float pos = random.nextInt(ring.size());
-        for (int i = 0; i < entries; i++) {
-            result.add(ring.get(Math.round(pos) % ring.size()));
-            pos += spacing;
+        int picks = Math.min(entries, ring.size());
+        if (picks <= 0) {
+            return List.of();
         }
-        return result;
+        int first = random.nextInt(ring.size());
+        double spacing = (double) ring.size() / picks;
+        return IntStream.range(0, picks)
+                .mapToObj(slot -> ring.get(Math.floorMod(first + (int) Math.round(slot * spacing), ring.size())))
+                .toList();
     }
 
     public static Hex pixelToHex(float x, float y, float size) {
@@ -93,9 +98,18 @@ public final class HexGrid {
     }
 
     public static Hex clampToDisk(Hex hex, int radius) {
-        if (distance(new Hex(0, 0), hex) <= radius) {
+        int bound = Math.max(0, radius);
+        if (distance(new Hex(0, 0), hex) <= bound) {
             return hex;
         }
-        return new Hex(Mth.clamp(hex.q(), -radius, radius), Mth.clamp(hex.r(), -radius, radius));
+        int q = Mth.clamp(hex.q(), -bound, bound);
+        int r = Mth.clamp(hex.r(), -bound, bound);
+        int sum = q + r;
+        if (sum > bound) {
+            q = bound - r;
+        } else if (sum < -bound) {
+            q = -bound - r;
+        }
+        return new Hex(q, r);
     }
 }

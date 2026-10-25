@@ -12,7 +12,6 @@ import com.leclowndu93150.thaumaturge.api.golems.accessory.GolemAccessoryBehavio
 import com.leclowndu93150.thaumaturge.api.golems.parts.IGolemArmAbility;
 import com.leclowndu93150.thaumaturge.api.golems.parts.IGolemPartAbility;
 import com.leclowndu93150.thaumaturge.api.golems.tasks.Task;
-import com.leclowndu93150.thaumaturge.config.ThaumaturgeCommonConfig;
 import com.leclowndu93150.thaumaturge.content.entity.construct.ConstructFollowOwnerGoal;
 import com.leclowndu93150.thaumaturge.content.entity.construct.ConstructOwnerHurtByTargetGoal;
 import com.leclowndu93150.thaumaturge.content.entity.construct.ConstructOwnerHurtTargetGoal;
@@ -22,7 +21,6 @@ import com.leclowndu93150.thaumaturge.content.golem.accessory.GolemAccessoryStat
 import com.leclowndu93150.thaumaturge.content.golem.ai.BlockTaskGoal;
 import com.leclowndu93150.thaumaturge.content.golem.ai.EntityTaskGoal;
 import com.leclowndu93150.thaumaturge.content.golem.ai.ReturnHomeGoal;
-import com.leclowndu93150.thaumaturge.content.particle.GolemEmoteParticleOptions;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.leclowndu93150.thaumaturge.registry.TTDataComponents;
 import com.leclowndu93150.thaumaturge.registry.TTEntityDataSerializers;
@@ -50,7 +48,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.DamageTypeTags;
-import net.minecraft.util.FastColor;
 import net.minecraft.util.Mth;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
@@ -137,11 +134,6 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     private static final ResourceLocation GOLEM_MASTERY_RESEARCH = TTIds.rl("golem_direct");
     private static final float RANK_UP_VOLUME = 0.25F;
     private static final int RANGED_TARGET_FORGET_DIST_SQR = 1024;
-    private static final int EVENT_EMOTE_TASK = 5;
-    private static final int EVENT_EMOTE_FAIL = 6;
-    private static final int EVENT_EMOTE_CONFUSED = 7;
-    private static final int EVENT_EMOTE_STAY = 8;
-    private static final int EVENT_EMOTE_RANKUP = 9;
 
     public boolean redrawParts;
     public float wheelRotation;
@@ -312,8 +304,12 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     }
 
     @Override
-    public void setProperties(IGolemProperties properties) {
+    public void applyBuild(IGolemProperties properties) {
+        if (level().isClientSide()) {
+            return;
+        }
         entityData.set(PROPS, GolemProperties.of(properties));
+        updateEntityAttributes();
     }
 
     @Override
@@ -353,7 +349,7 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     }
 
     @Override
-    public boolean isInCombat() {
+    public boolean isFighting() {
         return (getFlags() & FLAG_COMBAT) != 0;
     }
 
@@ -709,14 +705,10 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
         setFollowingOwner(!isFollowingOwner());
         if (isFollowingOwner()) {
             sendActionBar(player, "message.thaumaturge.golem.follow");
-            if (ThaumaturgeCommonConfig.SHOW_GOLEM_EMOTES.get()) {
-                level().broadcastEntityEvent(this, (byte) EVENT_EMOTE_TASK);
-            }
+            GolemEvent.FOLLOW.broadcast(this);
         } else {
             sendActionBar(player, "message.thaumaturge.golem.stay");
-            if (ThaumaturgeCommonConfig.SHOW_GOLEM_EMOTES.get()) {
-                level().broadcastEntityEvent(this, (byte) EVENT_EMOTE_STAY);
-            }
+            GolemEvent.STAY.broadcast(this);
             restrictTo(
                     blockPosition(), properties().hasTrait(TTGolemTraits.SCOUT.get()) ? HOME_RANGE_SCOUT : HOME_RANGE);
         }
@@ -806,7 +798,7 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
                 properties().arms().ability().onMeleeHit(this, target);
             }
             if (target instanceof Mob mob && !mob.isAlive()) {
-                addRankXp(KILL_XP);
+                grantRankExperience(KILL_XP);
             }
         }
         return hurt;
@@ -842,21 +834,24 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     }
 
     @Override
-    public void addRankXp(int xp) {
+    public void grantRankExperience(int xp) {
         GolemProperties props = properties();
-        if (level().isClientSide() || !props.hasTrait(TTGolemTraits.SMART.get()) || props.rank() >= MAX_RANK) {
+        if (xp <= 0
+                || level().isClientSide()
+                || !props.hasTrait(TTGolemTraits.SMART.get())
+                || props.rank() >= MAX_RANK) {
             return;
         }
-        rankXp += xp;
+        rankXp = (int) Math.min((long) rankXp + xp, Integer.MAX_VALUE);
         int needed = xpForNextRank(props.rank());
         if (rankXp < needed) {
             return;
         }
         rankXp -= needed;
-        setProperties(props.withRank(props.rank() + 1));
+        entityData.set(PROPS, GolemProperties.of(props.withRank(props.rank() + 1)));
         applyStats();
-        if (ThaumaturgeCommonConfig.SHOW_GOLEM_EMOTES.get()) {
-            level().broadcastEntityEvent(this, (byte) EVENT_EMOTE_RANKUP);
+        if (GolemEvent.emotesEnabled()) {
+            GolemEvent.RANK_UP.broadcast(this);
             playSound(SoundEvents.PLAYER_LEVELUP, RANK_UP_VOLUME, 1.0F);
         }
     }
@@ -870,43 +865,18 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     }
 
     @Override
-    public void swingArm() {
+    public void animateSwing() {
         swing(InteractionHand.MAIN_HAND, true);
     }
 
     @Override
     public void handleEntityEvent(byte id) {
-        switch (id) {
-            case EVENT_EMOTE_TASK -> emote(0.0, 1.0F, 1.0F, 1.0F, GolemEmoteParticleOptions.ICON_TASK, 6, 2.0F);
-            case EVENT_EMOTE_FAIL -> emote(0.025, 0.1F, 1.0F, 1.0F, GolemEmoteParticleOptions.ICON_FAIL, 10, 2.0F);
-            case EVENT_EMOTE_CONFUSED ->
-                emote(0.05, 1.0F, 1.0F, 1.0F, GolemEmoteParticleOptions.ICON_CONFUSED, 10, 2.0F);
-            case EVENT_EMOTE_STAY -> emote(0.01, 1.0F, 1.0F, 0.1F, GolemEmoteParticleOptions.ICON_STAY, 20, 2.0F);
-            case EVENT_EMOTE_RANKUP -> {
-                for (int i = 0; i < 5; i++) {
-                    GolemEmoteParticleOptions data = new GolemEmoteParticleOptions(
-                            0xFFFFFF,
-                            GolemEmoteParticleOptions.ICON_HEART,
-                            20 + random.nextInt(20),
-                            0.3F + random.nextFloat() * 0.4F);
-                    level().addParticle(
-                                    data,
-                                    getX(),
-                                    getY() + getBbHeight(),
-                                    getZ(),
-                                    random.nextGaussian() * 0.01F,
-                                    random.nextFloat() * 0.02,
-                                    random.nextGaussian() * 0.01F);
-                }
-            }
-            default -> super.handleEntityEvent(id);
+        GolemEvent event = GolemEvent.byId(id);
+        if (event == null) {
+            super.handleEntityEvent(id);
+        } else {
+            event.play(this);
         }
-    }
-
-    private void emote(double vy, float r, float g, float b, int icon, int age, float scale) {
-        GolemEmoteParticleOptions data = new GolemEmoteParticleOptions(
-                FastColor.ARGB32.color(255, (int) (r * 255), (int) (g * 255), (int) (b * 255)), icon, age, scale);
-        level().addParticle(data, getX(), getY() + getBbHeight() + 0.1, getZ(), 0.0, vy, 0.0);
     }
 
     @Override
@@ -930,8 +900,8 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     public void readAdditionalSaveData(CompoundTag input) {
         HolderLookup.Provider registries = registryAccess();
         super.readAdditionalSaveData(input);
-        TTNbt.read(input, "props", GolemProperties.CODEC, registries).ifPresent(this::setProperties);
-        restrictTo(TTNbt.read(input, "homepos", BlockPos.CODEC, registries).orElse(BlockPos.ZERO), HOME_RANGE);
+        TTNbt.read(input, "props", GolemProperties.CODEC, registries).ifPresent(this::applyBuild);
+        restrictTo(TTNbt.read(input, "homepos", BlockPos.CODEC, registries).orElse(blockPosition()), HOME_RANGE);
         entityData.set(FLAGS, (input.contains("gflags") ? input.getByte("gflags") : (byte) 0));
         rankXp = (input.contains("rankXP") ? input.getInt("rankXP") : 0);
         setGolemColor((input.contains("color") ? input.getByte("color") : (byte) 0));
@@ -942,6 +912,8 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
     }
 
     static final class GolemFlyingMoveControl extends MoveControl {
+        private static final double ARRIVAL_DAMPING = 0.2D;
+
         private final EntityThaumaturgeGolem golem;
 
         GolemFlyingMoveControl(EntityThaumaturgeGolem golem) {
@@ -960,13 +932,11 @@ public class EntityThaumaturgeGolem extends EntityOwnedConstruct implements IGol
             double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (dist < golem.getBoundingBox().getSize()) {
                 operation = Operation.WAIT;
-                golem.setDeltaMovement(golem.getDeltaMovement().scale(0.5));
+                golem.setDeltaMovement(golem.getDeltaMovement().scale(ARRIVAL_DAMPING));
             } else {
                 Vec3 motion = golem.getDeltaMovement();
-                golem.setDeltaMovement(motion.add(
-                        dx / dist * 0.033 * speedModifier,
-                        dy / dist * 0.0125 * speedModifier,
-                        dz / dist * 0.033 * speedModifier));
+                golem.setDeltaMovement(
+                        motion.add(GolemFlightSteering.desiredDelta(new Vec3(dx, dy, dz), speedModifier)));
                 if (golem.getTarget() == null) {
                     golem.setYRot(-((float) Mth.atan2(golem.getDeltaMovement().x, golem.getDeltaMovement().z))
                             * (180.0F / (float) Math.PI));

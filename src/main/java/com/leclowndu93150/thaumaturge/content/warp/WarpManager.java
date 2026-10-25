@@ -4,14 +4,12 @@ import com.leclowndu93150.thaumaturge.TTIds;
 import com.leclowndu93150.thaumaturge.api.capability.PlayerResearchAccess;
 import com.leclowndu93150.thaumaturge.api.items.IWarpingGear;
 import com.leclowndu93150.thaumaturge.api.warp.IPlayerWarp;
-import com.leclowndu93150.thaumaturge.api.warp.ItemWarp;
 import com.leclowndu93150.thaumaturge.api.warp.WarpHelper;
 import com.leclowndu93150.thaumaturge.api.warp.WarpType;
 import com.leclowndu93150.thaumaturge.compat.curio.ThaumaturgeCuriosCompat;
 import com.leclowndu93150.thaumaturge.content.research.ResearchManager;
 import com.leclowndu93150.thaumaturge.registry.TTAttachments;
 import com.leclowndu93150.thaumaturge.registry.TTDataComponents;
-import com.leclowndu93150.thaumaturge.registry.TTDataMaps;
 import com.leclowndu93150.thaumaturge.registry.TTSounds;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -78,10 +76,6 @@ public final class WarpManager {
         if (stack.getItem() instanceof IWarpingGear gear) {
             warp += gear.warp(stack, wearer);
         }
-        ItemWarp mapped = stack.getItem().builtInRegistryHolder().getData(TTDataMaps.ITEM_WARP);
-        if (mapped != null) {
-            warp += mapped.amount();
-        }
         warp += stack.getOrDefault(TTDataComponents.STACK_WARP.get(), 0);
         return warp;
     }
@@ -89,7 +83,7 @@ public final class WarpManager {
     public static int getWarpFromGear(ServerPlayer player) {
         int warp = getFinalWarp(player.getMainHandItem(), player);
         for (EquipmentSlot slot : EquipmentSlot.values()) {
-            if (slot.isArmor()) {
+            if (isHumanoidArmorSlot(slot)) {
                 warp += getFinalWarp(player.getItemBySlot(slot), player);
             }
         }
@@ -99,6 +93,10 @@ public final class WarpManager {
             }
         }
         return warp;
+    }
+
+    static boolean isHumanoidArmorSlot(EquipmentSlot slot) {
+        return slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR;
     }
 
     private static void notifyGain(ServerPlayer player, WarpType type) {

@@ -3,18 +3,21 @@ package com.leclowndu93150.thaumaturge.content.world.plant;
 import com.leclowndu93150.thaumaturge.TTIds;
 import com.leclowndu93150.thaumaturge.compat.dynamictrees.DynamicTreesPlacement;
 import com.mojang.serialization.Codec;
+import java.util.List;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderSet;
+import net.minecraft.core.Holder;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
@@ -22,12 +25,19 @@ import net.neoforged.fml.ModList;
 import org.jspecify.annotations.Nullable;
 
 public final class MagicForestFloraFeature extends Feature<MagicForestFloraConfig> {
-    private static final int GRASS_MIN_Y = 30;
-    private static final int VISHROOM_MIN_Y = 50;
-    private static final int PLACE_FLAGS = 19;
+    private static final int CHUNK_SPAN = 16;
+    private static final int CORE_INSET = 4;
+    private static final int CORE_SPAN = 8;
+    private static final int GROUND_FLOOR = 30;
+    private static final int VISHROOM_FLOOR = 50;
+    private static final int MUSHROOM_GRID = 4;
+    private static final int MUSHROOM_ORIGIN = 3;
+    private static final int MUSHROOM_STEP = 3;
+    private static final int LOG_REACH = 1;
     private static final int DYNAMIC_TREES_VISHROOM_ATTEMPT_MULTIPLIER = 4;
     private static final double FLOWER_NOISE_SCALE = 48.0;
-    private static final double MAX_FLOWER_SAMPLE = 0.9999;
+    private static final double FLOWER_NOISE_CLAMP_MAX = 0.9999;
+    private static final int PLANT_FLAGS = Block.UPDATE_ALL | Block.UPDATE_KNOWN_SHAPE;
 
     public MagicForestFloraFeature(Codec<MagicForestFloraConfig> codec) {
         super(codec);
@@ -37,129 +47,198 @@ public final class MagicForestFloraFeature extends Feature<MagicForestFloraConfi
     public boolean place(FeaturePlaceContext<MagicForestFloraConfig> context) {
         WorldGenLevel level = context.level();
         RandomSource random = context.random();
+        ChunkGenerator generator = context.chunkGenerator();
         MagicForestFloraConfig config = context.config();
-        BlockPos origin = context.origin();
-        BlockPos chunkOrigin = new BlockPos(origin.getX() & ~15, origin.getY(), origin.getZ() & ~15);
-        boolean any = false;
-        if (config.hugeMushrooms().size() > 0) {
-            for (int x = 0; x < 4; x++) {
-                for (int z = 0; z < 4; z++) {
-                    if (random.nextInt(config.hugeMushroomRarity()) == 0) {
-                        BlockPos grass = findGrass(
-                                level, chunkOrigin.getX() + 3 + x * 3, chunkOrigin.getZ() + 3 + z * 3, GRASS_MIN_Y);
-                        if (grass != null) {
-                            any |= config.hugeMushrooms()
-                                    .get(random.nextInt(config.hugeMushrooms().size()))
-                                    .value()
-                                    .place(level, context.chunkGenerator(), random, grass.above());
-                        }
-                    }
-                }
-            }
-        }
-        for (int attempt = 0;
-                attempt < config.flowerAttempts() && config.flowers().size() > 0;
-                attempt++) {
-            BlockPos grass = randomGrass(level, random, chunkOrigin);
+        ChunkPos chunk = new ChunkPos(context.origin());
+        int minX = chunk.getMinBlockX();
+        int minZ = chunk.getMinBlockZ();
+
+        boolean placed = placeHugeMushrooms(level, generator, random, config, minX, minZ);
+        placed |= placeFlowers(level, random, config, minX, minZ);
+        placed |= placeGroundCover(level, random, config, minX, minZ);
+        placed |= placeAmbientGrass(level, random, config, minX, minZ);
+        placed |= placeVishrooms(level, random, config, minX, minZ);
+        return placed;
+    }
+
+    private static boolean placeAmbientGrass(
+            WorldGenLevel level, RandomSource random, MagicForestFloraConfig config, int minX, int minZ) {
+        boolean placed = false;
+        for (int attempt = 0; attempt < config.grassAttempts(); attempt++) {
+            int x = minX + CORE_INSET + random.nextInt(CORE_SPAN);
+            int z = minZ + CORE_INSET + random.nextInt(CORE_SPAN);
+            BlockPos grass = grassBelowSky(level, x, z, GROUND_FLOOR);
             if (grass != null) {
-                any |= placePlant(level, grass.above(), flowerAt(config.flowers(), grass.above()));
+                BlockState state = config.ambientGrass().withPropertiesOf(level.getBlockState(grass));
+                level.setBlock(grass, state, PLANT_FLAGS);
+                placed = true;
             }
         }
+        return placed;
+    }
+
+    private static boolean placeHugeMushrooms(
+            WorldGenLevel level,
+            ChunkGenerator generator,
+            RandomSource random,
+            MagicForestFloraConfig config,
+            int minX,
+            int minZ) {
+        if (config.hugeMushrooms().size() == 0) {
+            return false;
+        }
+        boolean placed = false;
+        for (int cellX = 0; cellX < MUSHROOM_GRID; cellX++) {
+            for (int cellZ = 0; cellZ < MUSHROOM_GRID; cellZ++) {
+                if (random.nextInt(config.hugeMushroomRarity()) != 0) {
+                    continue;
+                }
+                BlockPos grass = grassBelowSky(
+                        level,
+                        minX + MUSHROOM_ORIGIN + MUSHROOM_STEP * cellX,
+                        minZ + MUSHROOM_ORIGIN + MUSHROOM_STEP * cellZ,
+                        GROUND_FLOOR);
+                if (grass == null) {
+                    continue;
+                }
+                BlockPos ground = grass.above();
+                placed |= config.hugeMushrooms()
+                        .get(random.nextInt(config.hugeMushrooms().size()))
+                        .value()
+                        .place(level, generator, random, ground);
+            }
+        }
+        return placed;
+    }
+
+    private static boolean placeFlowers(
+            WorldGenLevel level, RandomSource random, MagicForestFloraConfig config, int minX, int minZ) {
+        List<BlockState> flowers = config.flowers().stream()
+                .map(Holder::value)
+                .map(Block::defaultBlockState)
+                .toList();
+        if (flowers.isEmpty()) {
+            return false;
+        }
+        boolean placed = false;
+        for (int attempt = 0; attempt < config.flowerAttempts(); attempt++) {
+            BlockPos grass = grassBelowSky(
+                    level, minX + random.nextInt(CHUNK_SPAN), minZ + random.nextInt(CHUNK_SPAN), GROUND_FLOOR);
+            if (grass != null) {
+                BlockPos spot = grass.above();
+                placed |= placePlant(level, spot, pickFlower(flowers, spot));
+            }
+        }
+        return placed;
+    }
+
+    private static BlockState pickFlower(List<BlockState> flowers, BlockPos spot) {
+        return flowers.get(flowerIndexAt(spot, flowers.size()));
+    }
+
+    static int flowerIndexAt(BlockPos spot, int flowerCount) {
+        double noise = Biome.BIOME_INFO_NOISE.getValue(
+                spot.getX() / FLOWER_NOISE_SCALE, spot.getZ() / FLOWER_NOISE_SCALE, false);
+        double scaled = Mth.clamp((1.0 + noise) / 2.0, 0.0, FLOWER_NOISE_CLAMP_MAX);
+        return (int) (scaled * flowerCount);
+    }
+
+    private static boolean placeGroundCover(
+            WorldGenLevel level, RandomSource random, MagicForestFloraConfig config, int minX, int minZ) {
+        boolean placed = false;
         for (MagicForestFloraConfig.PlantPatch patch : config.plants()) {
             for (int attempt = 0; attempt < patch.attempts(); attempt++) {
                 if (random.nextInt(patch.rarity()) != 0) {
                     continue;
                 }
-                BlockPos grass = randomGrass(level, random, chunkOrigin);
+                BlockPos grass = grassBelowSky(
+                        level, minX + random.nextInt(CHUNK_SPAN), minZ + random.nextInt(CHUNK_SPAN), GROUND_FLOOR);
                 if (grass != null) {
-                    any |= placePlant(level, grass.above(), patch.state().getState(random, grass.above()));
+                    BlockPos spot = grass.above();
+                    placed |= placePlant(level, spot, patch.state().getState(random, spot));
                 }
             }
         }
-        for (int attempt = 0; attempt < config.grassAttempts(); attempt++) {
-            BlockPos grass = findGrass(
-                    level,
-                    chunkOrigin.getX() + 4 + random.nextInt(8),
-                    chunkOrigin.getZ() + 4 + random.nextInt(8),
-                    GRASS_MIN_Y);
-            if (grass != null) {
-                any |= level.setBlock(grass, config.ambientGrass().defaultBlockState(), PLACE_FLAGS);
-            }
-        }
-        int vishroomAttempts = config.vishroomAttempts();
-        if (ModList.get().isLoaded(TTIds.DYNAMIC_TREES)) {
-            vishroomAttempts *= DYNAMIC_TREES_VISHROOM_ATTEMPT_MULTIPLIER;
-        }
-        for (int attempt = 0; attempt < vishroomAttempts; attempt++) {
-            BlockPos grass = findGrass(
-                    level,
-                    chunkOrigin.getX() + random.nextInt(16),
-                    chunkOrigin.getZ() + random.nextInt(16),
-                    VISHROOM_MIN_Y);
-            if (grass != null && isAdjacentToWood(level, grass.above())) {
-                any |= placePlant(level, grass.above(), config.vishroom().defaultBlockState());
-            }
-        }
-        return any;
+        return placed;
     }
 
-    private static boolean placePlant(WorldGenLevel level, BlockPos pos, BlockState state) {
-        if (state.getBlock() instanceof DoublePlantBlock) {
-            state = state.setValue(DoublePlantBlock.HALF, DoubleBlockHalf.LOWER);
-            if (pos.getY() >= level.getMaxBuildHeight() - 1
-                    || !level.getBlockState(pos.above()).canBeReplaced()) {
-                return false;
-            }
-        }
-        if (!level.getBlockState(pos).canBeReplaced() || !state.canSurvive(level, pos)) {
+    private static boolean placePlant(WorldGenLevel level, BlockPos spot, BlockState plant) {
+        BlockState current = level.getBlockState(spot);
+        if (!current.getFluidState().isEmpty() || !current.canBeReplaced() || !plant.canSurvive(level, spot)) {
             return false;
         }
-        if (state.getBlock() instanceof DoublePlantBlock) {
-            DoublePlantBlock.placeAt(level, state, pos, PLACE_FLAGS);
+        if (plant.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
+            if (spot.getY() + 1 >= level.getMaxBuildHeight()
+                    || !level.getBlockState(spot.above()).canBeReplaced()) {
+                return false;
+            }
+            DoublePlantBlock.placeAt(level, plant, spot, PLANT_FLAGS);
             return true;
         }
-        return level.setBlock(pos, state, PLACE_FLAGS);
+        level.setBlock(spot, plant, PLANT_FLAGS);
+        return true;
     }
 
-    @SuppressWarnings("removal")
-    private static BlockState flowerAt(HolderSet<Block> flowers, BlockPos pos) {
-        double sample = Mth.clamp(
-                (1.0
-                                + Biome.BIOME_INFO_NOISE.getValue(
-                                        pos.getX() / FLOWER_NOISE_SCALE, pos.getZ() / FLOWER_NOISE_SCALE, false))
-                        / 2.0,
-                0.0,
-                MAX_FLOWER_SAMPLE);
-        return flowers.get((int) (sample * flowers.size())).value().defaultBlockState();
-    }
-
-    private static @Nullable BlockPos randomGrass(WorldGenLevel level, RandomSource random, BlockPos origin) {
-        return findGrass(level, origin.getX() + random.nextInt(16), origin.getZ() + random.nextInt(16), GRASS_MIN_Y);
-    }
-
-    private static @Nullable BlockPos findGrass(WorldGenLevel level, int x, int z, int minimumY) {
-        BlockPos.MutableBlockPos pos =
-                new BlockPos.MutableBlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
-        while (pos.getY() > minimumY) {
-            if (level.getBlockState(pos).is(Blocks.GRASS_BLOCK)) {
-                return pos.immutable();
-            }
-            pos.move(0, -1, 0);
+    private static boolean placeVishrooms(
+            WorldGenLevel level, RandomSource random, MagicForestFloraConfig config, int minX, int minZ) {
+        int attempts = config.vishroomAttempts();
+        if (ModList.get().isLoaded(TTIds.DYNAMIC_TREES)) {
+            attempts *= DYNAMIC_TREES_VISHROOM_ATTEMPT_MULTIPLIER;
         }
-        return null;
-    }
-
-    private static boolean isAdjacentToWood(WorldGenLevel level, BlockPos pos) {
-        boolean dynamicTreesLoaded = ModList.get().isLoaded(TTIds.DYNAMIC_TREES);
-        for (BlockPos adjacent : BlockPos.betweenClosed(pos.offset(-1, -1, -1), pos.offset(1, 1, 1))) {
-            if (adjacent.equals(pos)) {
+        boolean placed = false;
+        BlockState vishroom = config.vishroom().defaultBlockState();
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            BlockPos grass = grassBelowSky(
+                    level, minX + random.nextInt(CHUNK_SPAN), minZ + random.nextInt(CHUNK_SPAN), VISHROOM_FLOOR);
+            if (grass == null) {
                 continue;
             }
-            BlockState state = level.getBlockState(adjacent);
-            if (state.is(BlockTags.LOGS) || (dynamicTreesLoaded && DynamicTreesPlacement.isDynamicBranch(state))) {
-                return true;
+            BlockPos spot = grass.above();
+            if (roomForPlant(level.getBlockState(spot)) && besideLog(level, spot) && vishroom.canSurvive(level, spot)) {
+                level.setBlock(spot, vishroom, PLANT_FLAGS);
+                placed = true;
+            }
+        }
+        return placed;
+    }
+
+    private static boolean roomForPlant(BlockState state) {
+        return state.canBeReplaced()
+                && state.getFluidState().isEmpty()
+                && !state.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF);
+    }
+
+    private static boolean besideLog(WorldGenLevel level, BlockPos spot) {
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int dx = -LOG_REACH; dx <= LOG_REACH; dx++) {
+            for (int dy = -LOG_REACH; dy <= LOG_REACH; dy++) {
+                for (int dz = -LOG_REACH; dz <= LOG_REACH; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) {
+                        continue;
+                    }
+                    if (level.getBlockState(cursor.setWithOffset(spot, dx, dy, dz))
+                            .is(BlockTags.LOGS)) {
+                        return true;
+                    }
+                    if (ModList.get().isLoaded(TTIds.DYNAMIC_TREES)
+                            && DynamicTreesPlacement.isDynamicBranch(level.getBlockState(cursor))) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
+    }
+
+    private static @Nullable BlockPos grassBelowSky(WorldGenLevel level, int x, int z, int floorY) {
+        BlockPos.MutableBlockPos probe =
+                new BlockPos.MutableBlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
+        while (probe.getY() > floorY) {
+            if (level.getBlockState(probe).is(Blocks.GRASS_BLOCK)) {
+                return probe.immutable();
+            }
+            probe.move(0, -1, 0);
+        }
+        return null;
     }
 }

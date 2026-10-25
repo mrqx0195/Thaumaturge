@@ -33,6 +33,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageSources;
 import net.minecraft.world.entity.LivingEntity;
@@ -49,17 +50,11 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockDropsEvent;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 
 class InfusionEnchantmentRankCapTest {
-    @AfterEach
-    void clearRememberedSwings() {
-        InfusionEnchantmentEvents.resetSession();
-    }
-
     @Test
     void arcingUsesDeclaredMaximumForReach() {
         Player attacker = mock(Player.class);
@@ -158,6 +153,8 @@ class InfusionEnchantmentRankCapTest {
             InfusionEnchantmentEvents.onRightClickBlock(event);
 
             scanner.verify(() -> SoundingScan.perform(level, player, pos, InfusionEnchantment.SOUNDING.maxLevel()));
+            verify(event).setCanceled(true);
+            verify(event).setCancellationResult(InteractionResult.SUCCESS);
         }
     }
 
@@ -170,11 +167,37 @@ class InfusionEnchantmentRankCapTest {
         BlockState state = mock(BlockState.class);
         Player player = mock(Player.class);
         ItemStack tool = stackWithLevel(InfusionEnchantment.REFINING, Integer.MAX_VALUE);
+        when(tool.isCorrectToolForDrops(state)).thenReturn(true);
         ItemEntity drop = mock(ItemEntity.class);
         ItemStack originalDrop = new ItemStack(Items.RAW_IRON);
         when(drop.getItem()).thenReturn(originalDrop);
         when(player.getUUID()).thenReturn(UUID.randomUUID());
         when(player.getMainHandItem()).thenReturn(tool);
+        BlockDropsEvent event = blockDrops(level, state, player, new ArrayList<>(List.of(drop)));
+
+        try (MockedStatic<RefiningResults> refiningResults = mockStatic(RefiningResults.class)) {
+            refiningResults.when(() -> RefiningResults.clusterFor(state)).thenReturn(Items.IRON_INGOT);
+
+            InfusionEnchantmentEvents.onBlockDrops(event);
+        }
+
+        verify(drop).setItem(argThat(stack -> stack.is(Items.IRON_INGOT) && stack.getCount() == 1));
+    }
+
+    @Test
+    void refiningAppliesToMatchingDropsWithoutASecondToolGate() {
+        RandomSource random = mock(RandomSource.class);
+        when(random.nextDouble()).thenReturn(0.1);
+        ServerLevel level = mock(ServerLevel.class, org.mockito.Answers.RETURNS_DEEP_STUBS);
+        when(level.getRandom()).thenReturn(random);
+        BlockState state = mock(BlockState.class);
+        Player player = mock(Player.class);
+        ItemStack tool = stackWithLevel(InfusionEnchantment.REFINING, 1);
+        when(tool.isCorrectToolForDrops(state)).thenReturn(false);
+        when(player.getUUID()).thenReturn(UUID.randomUUID());
+        when(player.getMainHandItem()).thenReturn(tool);
+        ItemEntity drop = mock(ItemEntity.class);
+        when(drop.getItem()).thenReturn(new ItemStack(Items.RAW_IRON));
         BlockDropsEvent event = blockDrops(level, state, player, new ArrayList<>(List.of(drop)));
 
         try (MockedStatic<RefiningResults> refiningResults = mockStatic(RefiningResults.class)) {
@@ -231,6 +254,46 @@ class InfusionEnchantmentRankCapTest {
             assertEquals(
                     InfusionEnchantment.ESSENCE.maxLevel(),
                     generated.constructed().size());
+        }
+    }
+
+    @Test
+    void essenceSkipDoesNotDiscardUnselectedAspects() {
+        RandomSource random = mock(RandomSource.class);
+        AtomicInteger calls = new AtomicInteger();
+        when(random.nextInt(anyInt())).thenAnswer(invocation -> switch (calls.getAndIncrement()) {
+            case 0, 1, 2, 3, 4, 6 -> 0;
+            default -> 1;
+        });
+        ServerLevel level = mock(ServerLevel.class);
+        when(level.isClientSide()).thenReturn(false);
+        when(level.getRandom()).thenReturn(random);
+        Player killer = mock(Player.class);
+        LivingEntity victim = mock(LivingEntity.class);
+        ItemStack weapon = stackWithLevel(InfusionEnchantment.ESSENCE, InfusionEnchantment.ESSENCE.maxLevel());
+        DamageSource damageSource = mock(DamageSource.class);
+        when(killer.level()).thenReturn(level);
+        when(killer.getMainHandItem()).thenReturn(weapon);
+        when(victim.level()).thenReturn(level);
+        when(damageSource.getEntity()).thenReturn(killer);
+        LivingDropsEvent event = mock(LivingDropsEvent.class);
+        when(event.getSource()).thenReturn(damageSource);
+        when(event.getEntity()).thenReturn(victim);
+        List<ItemEntity> drops = new ArrayList<>();
+        when(event.getDrops()).thenReturn(drops);
+
+        AspectInstance aspect = new AspectInstance(Holder.direct(mock(IAspect.class)), 3);
+        AspectList aspects = AspectList.ofEntries(List.of(aspect));
+        try (MockedStatic<EntityAspects> entityAspects = mockStatic(EntityAspects.class);
+                MockedStatic<EssentiaCrystalFactory> crystals = mockStatic(EssentiaCrystalFactory.class);
+                MockedConstruction<ItemEntity> generated = mockConstruction(ItemEntity.class)) {
+            entityAspects.when(() -> EntityAspects.of(victim)).thenReturn(aspects);
+            crystals.when(() -> EssentiaCrystalFactory.of(aspect.aspect()))
+                    .thenReturn(new ItemStack(Items.AMETHYST_SHARD));
+
+            InfusionEnchantmentEvents.onLivingDrops(event);
+
+            assertEquals(3, generated.constructed().size());
         }
     }
 

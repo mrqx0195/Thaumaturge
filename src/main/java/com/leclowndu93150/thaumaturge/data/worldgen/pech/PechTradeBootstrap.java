@@ -78,6 +78,7 @@ public final class PechTradeBootstrap {
         add(mage, 5, Items.ENCHANTED_GOLDEN_APPLE);
         add(mage, 5, TTItems.PECH_WAND.get());
         add(mage, 5, TTItems.CURIO_KNOWLEDGE.get());
+        add(mage, 5, Items.TOTEM_OF_UNDYING);
         register(ctx, "mage", mage);
 
         List<PechTrade> stalker = new ArrayList<>();
@@ -87,12 +88,14 @@ public final class PechTradeBootstrap {
             }
         }
         add(stalker, 2, Items.GHAST_TEAR);
+        add(stalker, 2, Items.COMPASS);
         stalker.add(book(enchantments, 2, Enchantments.POWER));
         add(stalker, 3, Items.EXPERIENCE_BOTTLE);
         add(stalker, 3, Items.EXPERIENCE_BOTTLE);
         add(stalker, 3, Items.GOLDEN_APPLE);
         add(stalker, 4, TTItems.ELDRITCH_EYE.get());
         add(stalker, 4, Items.ENCHANTED_GOLDEN_APPLE);
+        add(stalker, 4, Items.SPECTRAL_ARROW);
         stalker.add(book(enchantments, 5, Enchantments.FLAME));
         stalker.add(book(enchantments, 5, Enchantments.INFINITY));
         add(stalker, 5, TTItems.CURIO_KNOWLEDGE.get());

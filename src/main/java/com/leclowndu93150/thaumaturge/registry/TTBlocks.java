@@ -53,7 +53,7 @@ import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchInset;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchNothing;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchNothingDormant;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchObelisk;
-import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchStructure;
+import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchPillar;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchTrap;
 import com.leclowndu93150.thaumaturge.content.eldritch.lock.BlockEldritchLock;
 import com.leclowndu93150.thaumaturge.content.eldritch.portal.BlockEldritchPortal;
@@ -926,7 +926,7 @@ public final class TTBlocks {
             BlockBehaviour.Properties.of()
                     .mapColor(MapColor.STONE)
                     .strength(0.5F)
-                    .sound(SoundType.STONE)
+                    .sound(SoundType.GLASS)
                     .randomTicks()
                     .lightLevel(state -> state.getValue(BlockVisBattery.CHARGE)));
 
@@ -2006,13 +2006,13 @@ public final class TTBlocks {
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(50.0F, 20000.0F)
                     .sound(SoundType.STONE)
-                    .lightLevel(state -> 8)
+                    .lightLevel(state -> state.getValue(BlockEldritchObelisk.PART) == 0 ? 8 : 0)
                     .noOcclusion()
                     .noLootTable());
 
-    public static final DeferredBlock<BlockEldritchStructure> ELDRITCH_PILLAR = BLOCKS.registerBlock(
+    public static final DeferredBlock<BlockEldritchPillar> ELDRITCH_PILLAR = BLOCKS.registerBlock(
             "eldritch_pillar",
-            BlockEldritchStructure::new,
+            BlockEldritchPillar::new,
             BlockBehaviour.Properties.of()
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(50.0F, 20000.0F)

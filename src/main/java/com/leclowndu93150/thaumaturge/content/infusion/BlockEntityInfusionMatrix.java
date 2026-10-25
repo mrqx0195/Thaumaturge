@@ -51,11 +51,30 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
     private static final int CRAFT_VALIDATE_INTERVAL = 20;
     private static final int CRAFT_RESURVEY_INTERVAL = 100;
     private static final int ITEM_PULL_TICKS = 5;
-    private static final int FINISH_GRACE_CYCLES = 2;
     private static final int INSTABILITY_ROLL_BOUND = 1500;
     private static final float MIN_COST_MULT = 0.5F;
     private static final float ESSENTIA_STARVE_PENALTY = 0.25F;
     private static final int ESSENTIA_FX_RANGE_TICKS = 12;
+    private static final int CLIENT_SOURCE_BASE_COUNT = MatrixPullParticleMath.SOURCE_PARTICLE_COUNT;
+    private static final int CLIENT_SPARKLE_ODDS = 3;
+    private static final float SPARKLE_GREEN = MatrixPullParticleMath.SPARKLE_GREEN;
+    private static final int GLYPH_INTERVAL = 5;
+    private static final float GLYPH_RED_LOW = 0.55F;
+    private static final float GLYPH_RED_RANGE = 0.25F;
+    private static final float GLYPH_GREEN = 0.12F;
+    private static final float GLYPH_BLUE_LOW = 0.75F;
+    private static final float GLYPH_BLUE_RANGE = 0.25F;
+    private static final int GLYPH_LIFETIME = 7;
+    private static final float GLYPH_DRIFT = -0.03F;
+    private static final float UNSTABLE_SPARKS_AT_FLOOR = 0.2F;
+    private static final int PROBLEM_SPARK_INTERVAL = 20;
+    private static final float PROBLEM_SPARK_RED = 0.65F;
+    private static final float PROBLEM_SPARK_GREEN = 0.2F;
+    private static final float PROBLEM_SPARK_BLUE = 0.9F;
+    private static final float PROBLEM_SPARK_SIZE = 0.35F;
+    private static final double PROBLEM_SPARK_INSET = 0.25;
+    private static final double PROBLEM_SPARK_SPAN = 0.5;
+    private static final double CRUMB_ITEM_KICK = MatrixPullParticleMath.CRUMB_ITEM_KICK;
     private static final double GOGGLES_TEXT_Y_OFFSET = 1.5;
 
     private static final DecimalFormat STABILITY_FORMAT = new DecimalFormat("#######.##");
@@ -67,7 +86,6 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
     private @Nullable InfusionCraftJob job;
     private int count;
     private int itemPullCountdown;
-    private int finishGrace;
     private boolean checkSurroundings = true;
     private @Nullable MatrixEnvironment environment;
     private final EssentiaSources essentiaSources = new EssentiaSources(this.worldPosition);
@@ -130,6 +148,7 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
             checkSurroundings = true;
         }
         MatrixEnvironment env = environment(level);
+        flagProblemBlocks(level, env);
         int interval = isCrafting() ? CRAFT_VALIDATE_INTERVAL : IDLE_VALIDATE_INTERVAL;
         if (count % interval == 0 && !MatrixEnvironment.validLocation(level, worldPosition)) {
             active = false;
@@ -150,19 +169,54 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
             syncToClient();
         }
         if (active && isCrafting()) {
-            if (count % 5 != 0) {
+            crackle(level);
+            if (count % GLYPH_INTERVAL != 0) {
                 return;
             }
             if (count % 65 == 0) {
                 level.playSound(null, worldPosition, TTSounds.INFUSER.get(), SoundSource.BLOCKS, 0.5F, 1.0F);
             }
-            RandomSource rand = level.getRandom();
+            RandomSource random = level.getRandom();
             Effects.blockRunes(level, Vec3.atLowerCornerOf(centralPedestal()))
-                    .color(0.5F + rand.nextFloat() * 0.2F, 0.1F, 0.7F + rand.nextFloat() * 0.3F)
-                    .duration(25)
-                    .gravity(-0.03F)
+                    .color(
+                            GLYPH_RED_LOW + random.nextFloat() * GLYPH_RED_RANGE,
+                            GLYPH_GREEN,
+                            GLYPH_BLUE_LOW + random.nextFloat() * GLYPH_BLUE_RANGE)
+                    .duration(GLYPH_LIFETIME)
+                    .gravity(GLYPH_DRIFT)
                     .send();
         }
+    }
+
+    private void crackle(ServerLevel level) {
+        float unrest = stability < 0.0F ? Math.min(1.0F, stability / STABILITY_FLOOR) : 0.0F;
+        RandomSource random = level.getRandom();
+        if (unrest <= 0.0F || random.nextFloat() >= unrest * UNSTABLE_SPARKS_AT_FLOOR) {
+            return;
+        }
+        Vec3 point = Vec3.atLowerCornerWithOffset(
+                worldPosition, random.nextDouble(), random.nextDouble(), random.nextDouble());
+        sendSpark(level, point);
+    }
+
+    private void flagProblemBlocks(ServerLevel level, MatrixEnvironment env) {
+        if (env.problemBlocks().isEmpty() || count % PROBLEM_SPARK_INTERVAL != 0) {
+            return;
+        }
+        RandomSource random = level.getRandom();
+        BlockPos problem =
+                env.problemBlocks().get(random.nextInt(env.problemBlocks().size()));
+        double x = PROBLEM_SPARK_INSET + random.nextDouble() * PROBLEM_SPARK_SPAN;
+        double y = PROBLEM_SPARK_INSET + random.nextDouble() * PROBLEM_SPARK_SPAN;
+        double z = PROBLEM_SPARK_INSET + random.nextDouble() * PROBLEM_SPARK_SPAN;
+        sendSpark(level, Vec3.atLowerCornerWithOffset(problem, x, y, z));
+    }
+
+    private static void sendSpark(ServerLevel level, Vec3 point) {
+        Effects.spark(level, point)
+                .color(PROBLEM_SPARK_RED, PROBLEM_SPARK_GREEN, PROBLEM_SPARK_BLUE)
+                .size(PROBLEM_SPARK_SIZE)
+                .send();
     }
 
     @Override
@@ -204,17 +258,32 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
             return false;
         }
         InfusionJobRecipe recipe = match.recipe();
-        job = new InfusionCraftJob(
-                recipe.jobComponents(input),
-                scaledCost(env, recipe.jobEssentia(input)),
-                recipe.jobResult(input, level.getRandom(), level.registryAccess()),
-                input.catalyst().copyWithCount(1),
-                recipe.jobInstability(input),
-                Optional.of(player.getUUID()));
+        InfusionCraftJob pendingJob = createCraftJob(recipe, input, env, player, level);
+        if (pendingJob == null) {
+            return false;
+        }
+        job = pendingJob;
         level.playSound(null, worldPosition, TTSounds.CRAFTSTART.get(), SoundSource.BLOCKS, 0.5F, 1.0F);
         setChanged();
         syncToClient();
         return true;
+    }
+
+    static @Nullable InfusionCraftJob createCraftJob(
+            InfusionJobRecipe recipe, InfusionInput input, MatrixEnvironment env, Player player, ServerLevel level) {
+        List<ItemStack> ingredients = recipe.jobComponents(input);
+        if (ingredients == null) {
+            return null;
+        }
+        AspectList cost = scaledCost(env, recipe.jobEssentia(input));
+        return new InfusionCraftJob(
+                ingredients,
+                cost,
+                recipe.jobResult(input, level.getRandom(), level.registryAccess()),
+                input.catalyst().copyWithCount(1),
+                recipe.jobInstability(input),
+                Optional.of(player.getUUID()),
+                cost);
     }
 
     InfusionInput stagedInput(ServerLevel level) {
@@ -273,7 +342,7 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
         stability = Mth.clamp(stability + env.stabilityReplenish(), STABILITY_FLOOR, STABILITY_CAP);
         boolean valid = catalystStillPresent(level);
         if (!valid || (stability < 0.0F && rand.nextInt(INSTABILITY_ROLL_BOUND) <= Math.abs(stability))) {
-            InstabilityEvents.trigger(level, worldPosition, env.pedestals());
+            InstabilityEvents.trigger(level, worldPosition, env.pedestals(), stability);
             stability += 5.0F + rand.nextFloat() * 5.0F;
             if (valid) {
                 syncToClient();
@@ -289,10 +358,7 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
             return;
         }
         if (job.ingredients().isEmpty()) {
-            if (finishGrace++ >= FINISH_GRACE_CYCLES) {
-                finishGrace = 0;
-                finishCraft(level);
-            }
+            finishCraft(level);
             return;
         }
         pullIngredientCycle(level, env);
@@ -393,11 +459,9 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
                 }
                 return;
             }
-            AspectList essentia = job.essentia();
-            if (!essentia.isEmpty() && level.getRandom().nextInt(1 + a) == 0) {
-                List<AspectInstance> entries = essentia.entries();
-                AspectInstance random = entries.get(level.getRandom().nextInt(entries.size()));
-                job.setEssentia(essentia.add(random.aspect(), 1));
+            RandomSource random = level.getRandom();
+            if (random.nextInt(1 + a) == 0) {
+                job.oweOneMore(random);
                 stability -= ESSENTIA_STARVE_PENALTY;
                 syncToClient();
             }
@@ -453,22 +517,12 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
     }
 
     private void tickClient() {
-        if (isCrafting()) {
-            if (clientCraftTicks == 0 && level != null) {
-                level.playLocalSound(worldPosition, TTSounds.INFUSERSTART.get(), SoundSource.BLOCKS, 0.5F, 1.0F, false);
-            }
-            clientCraftTicks++;
-        } else if (clientCraftTicks > 0) {
-            clientCraftTicks = Math.min(50, Math.max(0, clientCraftTicks - 2));
+        boolean crafting = isCrafting();
+        if (crafting && clientCraftTicks == 0 && level != null) {
+            level.playLocalSound(worldPosition, TTSounds.INFUSERSTART.get(), SoundSource.BLOCKS, 0.5F, 1.0F, false);
         }
-        if (active && clientStartUp < 1.0F) {
-            clientStartUp = Math.min(1.0F, clientStartUp + Math.max(clientStartUp / 10.0F, 0.001F));
-        } else if (!active && clientStartUp > 0.0F) {
-            clientStartUp -= clientStartUp / 10.0F;
-            if (clientStartUp < 0.001F) {
-                clientStartUp = 0.0F;
-            }
-        }
+        clientCraftTicks = InfusionClientAnimator.craftTicks(clientCraftTicks, crafting);
+        clientStartUp = InfusionClientAnimator.startUp(clientStartUp, active);
         tickClientSourceFX();
     }
 
@@ -502,47 +556,48 @@ public final class BlockEntityInfusionMatrix extends AbstractSyncedBlockEntity
     }
 
     private void spawnPullFX(RandomSource rand, BlockPos loc, ItemStack stack) {
-        double tx = worldPosition.getX() + 0.5;
-        double ty = worldPosition.getY() - 0.5;
-        double tz = worldPosition.getZ() + 0.5;
-        if (rand.nextInt(3) == 0) {
+        Vec3 goal = new Vec3(worldPosition.getX() + 0.5, worldPosition.getY() - 0.5, worldPosition.getZ() + 0.5);
+        if (rand.nextInt(CLIENT_SPARKLE_ODDS) == 0) {
+            float red = MatrixPullParticleMath.sparkleRed(rand.nextFloat());
+            float blue = MatrixPullParticleMath.sparkleBlue(rand.nextFloat());
             level.addParticle(
-                    new BoreSparkleParticleOptions(
-                            tx, ty, tz, 0.4F + rand.nextFloat() * 0.2F, 0.2F, 0.6F + rand.nextFloat() * 0.3F),
-                    loc.getX() + rand.nextFloat(),
-                    loc.getY() + rand.nextFloat() + 1.0F,
-                    loc.getZ() + rand.nextFloat(),
+                    new BoreSparkleParticleOptions(goal.x, goal.y, goal.z, red, SPARKLE_GREEN, blue),
+                    loc.getX() + rand.nextDouble(),
+                    loc.getY() + 1.0 + rand.nextDouble(),
+                    loc.getZ() + rand.nextDouble(),
                     0.0,
                     0.0,
                     0.0);
             return;
         }
-        ItemStack template = new ItemStack(stack.getItem());
+        ItemStack template = stack.copyWithCount(1);
         if (stack.getItem() instanceof BlockItem) {
-            for (int a = 0; a < 4; a++) {
+            for (int a = 0; a < CLIENT_SOURCE_BASE_COUNT; a++) {
                 level.addParticle(
-                        new InfusionCrumbsParticleOptions(template, tx, ty, tz, 0.0, 0.0, 0.0),
-                        loc.getX() + rand.nextFloat(),
-                        loc.getY() + rand.nextFloat() + 1.0F,
-                        loc.getZ() + rand.nextFloat(),
+                        new InfusionCrumbsParticleOptions(template, goal.x, goal.y, goal.z, 0.0, 0.0, 0.0),
+                        loc.getX() + rand.nextDouble(),
+                        loc.getY() + 1.0 + rand.nextDouble(),
+                        loc.getZ() + rand.nextDouble(),
                         0.0,
                         0.0,
                         0.0);
             }
         } else {
-            for (int a = 0; a < 4; a++) {
+            for (int a = 0; a < CLIENT_SOURCE_BASE_COUNT; a++) {
+                Vec3 start = MatrixPullParticleMath.nonBlockItemStart(
+                        loc, rand.nextDouble(), rand.nextDouble(), rand.nextDouble());
                 level.addParticle(
                         new InfusionCrumbsParticleOptions(
                                 template,
-                                tx,
-                                ty,
-                                tz,
-                                rand.nextGaussian() * 0.03F,
-                                rand.nextGaussian() * 0.03F,
-                                rand.nextGaussian() * 0.03F),
-                        loc.getX() + 0.4F + rand.nextFloat() * 0.2F,
-                        loc.getY() + 1.23F + rand.nextFloat() * 0.2F,
-                        loc.getZ() + 0.4F + rand.nextFloat() * 0.2F,
+                                goal.x,
+                                goal.y,
+                                goal.z,
+                                rand.nextGaussian() * CRUMB_ITEM_KICK,
+                                rand.nextGaussian() * CRUMB_ITEM_KICK,
+                                rand.nextGaussian() * CRUMB_ITEM_KICK),
+                        start.x,
+                        start.y,
+                        start.z,
                         0.0,
                         0.0,
                         0.0);

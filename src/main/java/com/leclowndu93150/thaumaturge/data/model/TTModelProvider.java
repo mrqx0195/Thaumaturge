@@ -102,7 +102,6 @@ public final class TTModelProvider implements DataProvider {
             Optional.of(TTIds.rl("block/condenser")), Optional.empty(), TextureSlot.SIDE, TextureSlot.PARTICLE);
 
     private static final ResourceLocation GENERATED_PARENT = ResourceLocation.withDefaultNamespace("item/generated");
-    private static final ResourceLocation BEWLR_BLOCK_PARENT = TTIds.rl("item/bewlr_block");
     private static final ResourceLocation PROPERTY_LINKED = TTIds.rl("linked");
     private static final ResourceLocation PROPERTY_LOADED = TTIds.rl("loaded");
     private static final ResourceLocation PROPERTY_NOTE_COMPLETE = TTIds.rl("note_complete");
@@ -158,7 +157,6 @@ public final class TTModelProvider implements DataProvider {
     private static final Set<String> CHECKED_IN_ITEM_MODELS = Set.of(
             "advanced_alchemical_furnace",
             "bellows",
-            "flux_scrubber",
             "leaves_greatwood",
             "leaves_silverwood",
             "plank_greatwood",
@@ -185,6 +183,7 @@ public final class TTModelProvider implements DataProvider {
         registerResearchTable();
         registerDeconstructionTable();
         registerResearchNote();
+        registerAdvancedAlchemicalFurnaceItem();
         registerConstructs();
         decorModels();
         eldritchModels();
@@ -199,6 +198,7 @@ public final class TTModelProvider implements DataProvider {
         registerAuraDevices(blockModels);
         registerNoiseDevices();
         TubeModels.register(blockStateOutput);
+        registerFluxScrubberModels();
         registerEssentiaReservoir();
         blockStateOutput.accept(
                 MultiVariantGenerator.multiVariant(TTBlocks.ESSENTIA_CRYSTALIZER.get(), vName("essentia_crystalizer"))
@@ -258,7 +258,7 @@ public final class TTModelProvider implements DataProvider {
         delegateItem(TTBlocks.NODE_STABILIZER_ADVANCED.get().asItem(), TTIds.rl("item/node_stabilizer_base"));
         delegateItem(TTBlocks.NODE_TRANSDUCER.get().asItem(), TTIds.rl("item/node_stabilizer_base"));
         simpleBlock(TTBlocks.JAR_NODE.get(), TTIds.rl("block/jar_normal"));
-        delegateItem(TTBlocks.JAR_NODE.get().asItem(), BEWLR_BLOCK_PARENT);
+        delegateItem(TTBlocks.JAR_NODE.get().asItem(), TTIds.rl("item/special_block_item_base"));
         horizontalBlock(TTBlocks.INFERNAL_FURNACE.get(), "infernal_furnace");
         simpleBlock(
                 TTBlocks.NETHER_BRICKS_PLACEHOLDER.get(), ModelLocationUtils.getModelLocation(Blocks.NETHER_BRICKS));
@@ -482,6 +482,58 @@ public final class TTModelProvider implements DataProvider {
         plantModels();
         taintModels();
         containerItemModels();
+    }
+
+    private void registerAdvancedAlchemicalFurnaceItem() {
+        JsonObject model = new JsonObject();
+        model.addProperty("parent", "minecraft:builtin/entity");
+
+        JsonObject display = new JsonObject();
+        JsonObject gui = new JsonObject();
+        gui.add("rotation", floatTriple(30, 225, 0));
+        gui.add("translation", floatTriple(0, -2.75F, 0));
+        gui.add("scale", floatTriple(0.625F, 0.625F, 0.625F));
+        display.add("gui", gui);
+
+        JsonObject fixed = new JsonObject();
+        fixed.add("translation", floatTriple(0, -3.5F, 0));
+        fixed.add("scale", floatTriple(0.625F, 0.625F, 0.625F));
+        display.add("fixed", fixed);
+        model.add("display", display);
+
+        modelOutput.accept(TTIds.rl("item/advanced_alchemical_furnace"), () -> model);
+    }
+
+    private void registerFluxScrubberModels() {
+        modelOutput.accept(TTIds.rl("block/flux_scrubber"), () -> fluxScrubberModel(true));
+        modelOutput.accept(TTIds.rl("item/flux_scrubber"), () -> fluxScrubberModel(false));
+    }
+
+    private static JsonObject fluxScrubberModel(boolean hideTip) {
+        JsonObject model = new JsonObject();
+        model.addProperty("parent", "minecraft:block/block");
+        model.addProperty("loader", "thaumaturge:mesh");
+        model.addProperty("gui_light", "side");
+        model.addProperty("model", "thaumaturge:models/mesh/flux_scrubber.ttmesh");
+
+        JsonObject textures = new JsonObject();
+        textures.addProperty("texture0", "thaumaturge:block/flux_scrubber");
+        textures.addProperty("particle", "thaumaturge:block/al_furnace_side");
+        model.add("textures", textures);
+        model.addProperty("render_type", "minecraft:cutout");
+        model.addProperty("flip_v", true);
+
+        JsonObject transform = new JsonObject();
+        transform.add("translation", floatTriple(0, 0, -0.5F));
+        transform.addProperty("origin", "corner");
+        model.add("transform", transform);
+
+        if (hideTip) {
+            JsonObject visibility = new JsonObject();
+            visibility.addProperty("Tip", false);
+            model.add("visibility", visibility);
+        }
+        return model;
     }
 
     private void registerManaPod() {
@@ -772,6 +824,34 @@ public final class TTModelProvider implements DataProvider {
         return dispatch;
     }
 
+    private static PropertyDispatch taintFeatureFacingDispatch() {
+        return PropertyDispatch.property(BlockStateProperties.FACING)
+                .select(Direction.UP, Variant.variant())
+                .select(
+                        Direction.DOWN,
+                        Variant.variant().with(VariantProperties.X_ROT, VariantProperties.Rotation.R180))
+                .select(
+                        Direction.NORTH,
+                        Variant.variant()
+                                .with(VariantProperties.X_ROT, VariantProperties.Rotation.R270)
+                                .with(VariantProperties.Y_ROT, VariantProperties.Rotation.R180))
+                .select(
+                        Direction.SOUTH,
+                        Variant.variant()
+                                .with(VariantProperties.X_ROT, VariantProperties.Rotation.R90)
+                                .with(VariantProperties.Y_ROT, VariantProperties.Rotation.R180))
+                .select(
+                        Direction.WEST,
+                        Variant.variant()
+                                .with(VariantProperties.X_ROT, VariantProperties.Rotation.R90)
+                                .with(VariantProperties.Y_ROT, VariantProperties.Rotation.R270))
+                .select(
+                        Direction.EAST,
+                        Variant.variant()
+                                .with(VariantProperties.X_ROT, VariantProperties.Rotation.R90)
+                                .with(VariantProperties.Y_ROT, VariantProperties.Rotation.R90));
+    }
+
     private static Variant hangingRotation(Direction direction) {
         return switch (direction) {
             case DOWN -> Variant.variant();
@@ -951,7 +1031,7 @@ public final class TTModelProvider implements DataProvider {
 
     private void registerJar(Block block, String modelName) {
         simpleBlock(block, TTIds.rl("block/" + modelName));
-        delegateItem(block.asItem(), BEWLR_BLOCK_PARENT);
+        delegateItem(block.asItem(), TTIds.rl("item/special_block_item_base"));
     }
 
     private void registerAlembic(Block block) {
@@ -1135,7 +1215,7 @@ public final class TTModelProvider implements DataProvider {
                     flat.addProperty("parent", TTIds.rl("item/nitor").toString());
                     model.add("base", flat);
                     JsonObject inHand = new JsonObject();
-                    inHand.addProperty("parent", BEWLR_BLOCK_PARENT.toString());
+                    inHand.addProperty("parent", TTIds.rl("item/nitor").toString());
                     JsonObject perspectives = new JsonObject();
                     perspectives.add("firstperson_lefthand", inHand);
                     perspectives.add("firstperson_righthand", inHand);
@@ -1220,18 +1300,20 @@ public final class TTModelProvider implements DataProvider {
 
         ResourceLocation inlayDot = TTIds.rl("block/inlay_dot");
         ResourceLocation inlaySide = TTIds.rl("block/inlay_side");
+        // Separate perpendicular arms slightly in height so their translucent quads do not z-fight.
+        ResourceLocation inlaySideOffset = TTIds.rl("block/inlay_side_offset");
         MultiPartGenerator inlayGenerator = MultiPartGenerator.multiPart(TTBlocks.INLAY.get())
                 .with(v(inlayDot))
                 .with(Condition.condition().term(BlockInlay.NORTH, true), v(inlaySide))
                 .with(
                         Condition.condition().term(BlockInlay.EAST, true),
-                        v(inlaySide).with(VariantProperties.Y_ROT, VariantProperties.Rotation.R90))
+                        v(inlaySideOffset).with(VariantProperties.Y_ROT, VariantProperties.Rotation.R90))
                 .with(
                         Condition.condition().term(BlockInlay.SOUTH, true),
                         v(inlaySide).with(VariantProperties.Y_ROT, VariantProperties.Rotation.R180))
                 .with(
                         Condition.condition().term(BlockInlay.WEST, true),
-                        v(inlaySide).with(VariantProperties.Y_ROT, VariantProperties.Rotation.R270));
+                        v(inlaySideOffset).with(VariantProperties.Y_ROT, VariantProperties.Rotation.R270));
         blockStateOutput.accept(inlayGenerator);
         ModelTemplates.TWO_LAYERED_ITEM.create(
                 ModelLocationUtils.getModelLocation(TTItems.INLAY.get()),
@@ -1345,7 +1427,7 @@ public final class TTModelProvider implements DataProvider {
 
     private void registerJarBrain() {
         simpleBlock(TTBlocks.JAR_BRAIN.get(), TTIds.rl("block/jar_normal"));
-        delegateItem(TTBlocks.JAR_BRAIN.get().asItem(), BEWLR_BLOCK_PARENT);
+        delegateItem(TTBlocks.JAR_BRAIN.get().asItem(), TTIds.rl("item/special_block_item_base"));
     }
 
     private void registerNoiseDevices() {
@@ -1418,7 +1500,7 @@ public final class TTModelProvider implements DataProvider {
                                         Map.of("parent", "thaumaturge:block/centrifuge_spinner")))));
 
         registerInvisibleBlock(TTBlocks.HUNGRY_CHEST.get());
-        delegateItem(TTItems.HUNGRY_CHEST.get(), BEWLR_BLOCK_PARENT);
+        delegateItem(TTItems.HUNGRY_CHEST.get(), TTIds.rl("item/special_block_item_base"));
     }
 
     private void registerLattice(Block block, String coreModel) {
@@ -1747,6 +1829,9 @@ public final class TTModelProvider implements DataProvider {
                 TTBlocks.TAINT_CRUST.get(),
                 rotatedWeighted(
                         new String[] {"taint_crust_0", "taint_crust_1", "taint_crust_2"}, new int[] {8, 1, 1})));
+        blockStateOutput.accept(MultiVariantGenerator.multiVariant(
+                        TTBlocks.TAINT_FEATURE.get(), vName("taint_orb_0"), vName("taint_orb_1"), vName("taint_orb_2"))
+                .with(taintFeatureFacingDispatch()));
 
         simpleFromExisting(TTBlocks.FLUX_GOO.get(), "flux_goo");
         translucentCube(TTBlocks.FLUX_GAS.get());
@@ -1939,6 +2024,8 @@ public final class TTModelProvider implements DataProvider {
     }
 
     private void arcaneDoor() {
+        BiConsumer<ResourceLocation, Supplier<JsonElement>> cutoutOutput =
+                (id, json) -> modelOutput.accept(id, () -> cutout(json.get()));
         TextureMapping textures = new TextureMapping()
                 .put(TextureSlot.TOP, blockTexture("arcane_door_top"))
                 .put(TextureSlot.BOTTOM, blockTexture("arcane_door_bottom"));
@@ -1950,10 +2037,14 @@ public final class TTModelProvider implements DataProvider {
                 ModelTemplates.DOOR_BOTTOM_RIGHT.create(TTBlocks.ARCANE_DOOR.get(), textures, modelOutput);
         ResourceLocation bottomRightOpen =
                 ModelTemplates.DOOR_BOTTOM_RIGHT_OPEN.create(TTBlocks.ARCANE_DOOR.get(), textures, modelOutput);
-        ResourceLocation topLeft = TTIds.rl("block/arcane_door_top_left");
-        ResourceLocation topLeftOpen = TTIds.rl("block/arcane_door_top_left_open");
-        ResourceLocation topRight = TTIds.rl("block/arcane_door_top_right");
-        ResourceLocation topRightOpen = TTIds.rl("block/arcane_door_top_right_open");
+        ResourceLocation topLeft =
+                ModelTemplates.DOOR_TOP_LEFT.create(TTBlocks.ARCANE_DOOR.get(), textures, cutoutOutput);
+        ResourceLocation topLeftOpen =
+                ModelTemplates.DOOR_TOP_LEFT_OPEN.create(TTBlocks.ARCANE_DOOR.get(), textures, cutoutOutput);
+        ResourceLocation topRight =
+                ModelTemplates.DOOR_TOP_RIGHT.create(TTBlocks.ARCANE_DOOR.get(), textures, cutoutOutput);
+        ResourceLocation topRightOpen =
+                ModelTemplates.DOOR_TOP_RIGHT_OPEN.create(TTBlocks.ARCANE_DOOR.get(), textures, cutoutOutput);
         blockStateOutput.accept(MultiVariantGenerator.multiVariant(TTBlocks.ARCANE_DOOR.get())
                 .with(doorHalf(
                         doorHalf(
@@ -2534,7 +2625,7 @@ public final class TTModelProvider implements DataProvider {
         column(TTBlocks.ELDRITCH_PEDESTAL.get(), "eldritch_pedestal_side", "eldritch_stone");
         invisibleWithMeshItem(TTBlocks.ELDRITCH_ALTAR.get(), "eldritch_altar", "eldritch_altar_item");
         invisibleWithCubeItem(TTBlocks.ELDRITCH_OBELISK.get(), "eldritch_deco");
-        invisibleWithCubeItem(TTBlocks.ELDRITCH_PILLAR.get(), "eldritch_deco");
+        cube(TTBlocks.ELDRITCH_PILLAR.get(), "eldritch_deco");
         invisibleWithCubeItem(TTBlocks.ELDRITCH_CAPSTONE.get(), "eldritch_deco");
         trap();
         invisible(TTBlocks.ELDRITCH_NOTHING.get());
@@ -2581,15 +2672,13 @@ public final class TTModelProvider implements DataProvider {
     private static final int INSET_DEPTH = 2;
     private static final int INSET_ALL_EXPOSED = 63;
 
-    private void insetBlock(Block block, String textureName, boolean staticAllExposedModel) {
+    private void insetBlock(Block block, String textureName, boolean allExposedItemDisplay) {
         ResourceLocation texture = TTIds.rl("block/" + textureName);
         MultiPartGenerator generator = MultiPartGenerator.multiPart(block);
         for (int mask = 0; mask <= INSET_ALL_EXPOSED; mask++) {
             ResourceLocation model = TTIds.rl("block/" + textureName + "_inset_" + mask);
             int finalMask = mask;
-            if (!staticAllExposedModel || mask != INSET_ALL_EXPOSED) {
-                modelOutput.accept(model, () -> insetModel(texture, finalMask));
-            }
+            modelOutput.accept(model, () -> insetModel(texture, finalMask, allExposedItemDisplay));
             Condition.TerminalCondition condition = Condition.condition();
             for (Direction dir : Direction.values()) {
                 condition = condition.term(BlockEldritchInset.EXPOSED.get(dir), insetExposed(mask, dir));
@@ -2604,7 +2693,7 @@ public final class TTModelProvider implements DataProvider {
         return (mask & (1 << dir.get3DDataValue())) != 0;
     }
 
-    private static JsonElement insetModel(ResourceLocation texture, int mask) {
+    private static JsonElement insetModel(ResourceLocation texture, int mask, boolean allExposedItemDisplay) {
         JsonObject root = new JsonObject();
         JsonObject textures = new JsonObject();
         textures.addProperty("particle", texture.toString());
@@ -2636,7 +2725,38 @@ public final class TTModelProvider implements DataProvider {
         JsonArray elements = new JsonArray();
         elements.add(element);
         root.add("elements", elements);
+        if (mask == INSET_ALL_EXPOSED && allExposedItemDisplay) {
+            root.add("display", insetItemDisplay());
+        }
         return root;
+    }
+
+    private static JsonObject insetItemDisplay() {
+        JsonObject display = new JsonObject();
+        display.add("gui", displayTransform(30, -135, 0, 0, 0, 0, 0.8F));
+        display.add("thirdperson_righthand", displayTransform(75, 45, 0, 0, 3, 0, 0.5F));
+        display.add("thirdperson_lefthand", displayTransform(75, 45, 0, 0, 3, 0, 0.5F));
+        display.add("firstperson_righthand", displayTransform(0, 45, 0, 0, 0, 0, 0.5F));
+        display.add("firstperson_lefthand", displayTransform(0, -45, 0, 0, 0, 0, 0.5F));
+        display.add("ground", displayTransform(0, 0, 0, 0, 2.5F, 0, 0.35F));
+        return display;
+    }
+
+    private static JsonObject displayTransform(
+            float rotX, float rotY, float rotZ, float moveX, float moveY, float moveZ, float scale) {
+        JsonObject transform = new JsonObject();
+        transform.add("rotation", floatTriple(rotX, rotY, rotZ));
+        transform.add("translation", floatTriple(moveX, moveY, moveZ));
+        transform.add("scale", floatTriple(scale, scale, scale));
+        return transform;
+    }
+
+    private static JsonArray floatTriple(float x, float y, float z) {
+        JsonArray values = new JsonArray();
+        values.add(x);
+        values.add(y);
+        values.add(z);
+        return values;
     }
 
     private static JsonArray insetCoords(int x, int y, int z) {

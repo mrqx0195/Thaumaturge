@@ -7,6 +7,8 @@ public final class TTScreenTextures {
     public static final int TEX_SIZE = 256;
 
     public static final ResourceLocation ARCANE_WORKBENCH = gui("arcane_workbench.png");
+    public static final ResourceLocation RADIAL_INNER = misc("radial.png");
+    public static final ResourceLocation RADIAL_OUTER = misc("radial2.png");
     public static final ResourceLocation GUI_BASE = gui("gui_base.png");
     public static final ResourceLocation GUI_LOGISTICS = gui("gui_logistics.png");
     public static final ResourceLocation RESEARCH_BROWSER = gui("gui_research_browser.png");
@@ -27,12 +29,18 @@ public final class TTScreenTextures {
 
     public static final ResourceLocation HUD_HOVER_SPARK = gui("hud_hover_spark.png");
     public static final ResourceLocation THAUMOSTATIC_HARNESS = gui("gui_thaumostatic_harness.png");
+    public static final ResourceLocation FOCAL_STRIP = gui("gui_wandtable.png");
+    public static final ResourceLocation FOCAL_CABINET = gui("gui_wandtable3.png");
     public static final ResourceLocation HUD = gui("hud.png");
 
     private TTScreenTextures() {}
 
     private static ResourceLocation gui(String name) {
         return ResourceLocation.fromNamespaceAndPath(TTIds.MODID, "textures/gui/" + name);
+    }
+
+    private static ResourceLocation misc(String name) {
+        return ResourceLocation.fromNamespaceAndPath(TTIds.MODID, "textures/misc/" + name);
     }
 
     private static ResourceLocation research(String name) {

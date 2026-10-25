@@ -18,6 +18,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class AbstractTaintSeed extends AbstractRootedTaint {
     private static final int SPREAD_INTERVAL = 20;
@@ -37,7 +38,7 @@ public abstract class AbstractTaintSeed extends AbstractRootedTaint {
 
     public float attackAnim;
 
-    private boolean registered;
+    private @Nullable BlockPos registeredPosition;
 
     protected AbstractTaintSeed(EntityType<? extends AbstractTaintSeed> type, Level level) {
         super(type, level);
@@ -71,9 +72,10 @@ public abstract class AbstractTaintSeed extends AbstractRootedTaint {
 
     @Override
     protected void rootedServerStep(ServerLevel server) {
-        if (!registered) {
-            TaintSeedRegistry.get(server).addSeed(this.blockPosition());
-            registered = true;
+        BlockPos position = this.blockPosition();
+        if (!position.equals(registeredPosition)) {
+            TaintSeedRegistry.get(server).moveSeed(registeredPosition, position);
+            registeredPosition = position.immutable();
         }
         if (this.tickCount % SPREAD_INTERVAL != 0) {
             return;
@@ -104,7 +106,7 @@ public abstract class AbstractTaintSeed extends AbstractRootedTaint {
             int dx = Mth.nextInt(server.getRandom(), -area * 3, area * 3);
             int dy = Mth.nextInt(server.getRandom(), -area, area);
             int dz = Mth.nextInt(server.getRandom(), -area * 3, area * 3);
-            TaintHelper.spreadFibres(server, pos.offset(dx, dy, dz), true);
+            TaintHelper.attemptFibreGrowth(server, pos.offset(dx, dy, dz), true);
         }
         applyAuraTouch(server);
     }
@@ -112,16 +114,21 @@ public abstract class AbstractTaintSeed extends AbstractRootedTaint {
     private void applyAuraTouch(ServerLevel server) {
         double radius = getArea() * FLUX_TAINT_RADIUS_MULT;
         for (LivingEntity target : server.getEntitiesOfClass(
-                LivingEntity.class, this.getBoundingBox().inflate(radius), e -> e != this && !MobTraits.isTainted(e))) {
+                LivingEntity.class, this.getBoundingBox().inflate(radius), e -> canAfflict(this, e))) {
             target.addEffect(new MobEffectInstance(
                     TTMobEffects.FLUX_TAINT, FLUX_TAINT_TICKS, Math.max(0, getArea() - 1), true, false, false));
         }
     }
 
+    static boolean canAfflict(LivingEntity seed, LivingEntity target) {
+        return target != seed && target.isAlive() && !target.isSpectator() && !MobTraits.isTainted(target);
+    }
+
     @Override
     public void remove(Entity.RemovalReason reason) {
-        if (this.level() instanceof ServerLevel server) {
-            TaintSeedRegistry.get(server).removeSeed(this.blockPosition());
+        if (this.level() instanceof ServerLevel server && registeredPosition != null) {
+            TaintSeedRegistry.get(server).removeSeed(registeredPosition);
+            registeredPosition = null;
         }
         super.remove(reason);
     }

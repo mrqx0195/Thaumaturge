@@ -36,6 +36,7 @@ import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,14 +115,14 @@ class LampDeviceCutoffTest {
     }
 
     @Test
-    void fertilitySuctionDropsTenPerChargeAndNativeNbtRetainsTheCounter() {
+    void fertilitySuctionTapersWithStoredChargeAndNativeNbtRetainsTheCounter() {
         var lamp = fertility(0);
         for (int charges = 0; charges <= 10; charges++) {
             CompoundTag stored = new CompoundTag();
             stored.putInt("charges", charges);
             lamp.loadAdditional(stored, registries);
-            assertEquals(128 - 10 * charges, lamp.intakeSuction(128));
             assertEquals(charges < 10, lamp.wantsEssentia());
+            assertEquals(128 - 10 * charges, lamp.intakeSuction(128));
             assertEquals(
                     charges < 10 ? EssentiaPull.of(desire, 128 - 10 * charges) : EssentiaPull.NONE,
                     lamp.intake().pull(Direction.EAST));
@@ -130,6 +131,47 @@ class LampDeviceCutoffTest {
         }
         lamp.loadAdditional(new CompoundTag(), registries);
         assertEquals(0, save(lamp).getInt("charges"));
+    }
+
+    @Test
+    void arcaneLampSkipsHeightmapLookupForAnUnloadedTargetColumn() {
+        var state = TTBlocks.LAMP_ARCANE.get().defaultBlockState();
+        var lamp = new BlockEntityLampArcane(BlockPos.ZERO, state);
+        when(level.getGameTime()).thenReturn(0L);
+        when(level.hasNeighborSignal(BlockPos.ZERO)).thenReturn(false);
+        when(level.hasChunkAt(any())).thenReturn(false);
+
+        BlockEntityLampArcane.serverTick(level, BlockPos.ZERO, state, lamp);
+
+        verify(level).hasChunkAt(BlockPos.ZERO);
+        verify(level, never()).getHeight(Heightmap.Types.MOTION_BLOCKING, 0, 0);
+        verify(level, never()).getBlockState(any());
+    }
+
+    @Test
+    void arcaneLampRemovesItsGeneratedLightsBeforeRemoval() {
+        var state = TTBlocks.LAMP_ARCANE.get().defaultBlockState();
+        var lamp = new BlockEntityLampArcane(BlockPos.ZERO, state);
+        BlockPos glimmer = BlockPos.ZERO.offset(1, 2, 3);
+        Set<BlockPos> visited = new HashSet<>();
+        lamp.setLevel(level);
+        when(level.getBlockEntity(BlockPos.ZERO)).thenReturn(lamp);
+        when(level.hasChunkAt(any())).thenAnswer(call -> {
+            BlockPos column = call.getArgument(0);
+            return column.getX() == glimmer.getX() && column.getZ() == glimmer.getZ();
+        });
+        when(level.getBlockState(any())).thenAnswer(call -> {
+            BlockPos position = call.getArgument(0);
+            visited.add(position.immutable());
+            return position.equals(glimmer)
+                    ? TTBlocks.EFFECT_GLIMMER.get().defaultBlockState()
+                    : Blocks.AIR.defaultBlockState();
+        });
+
+        TTBlocks.LAMP_ARCANE.get().onRemove(state, level, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), false);
+
+        assertTrue(visited.contains(glimmer));
+        verify(level).setBlock(any(), eq(Blocks.AIR.defaultBlockState()), eq(Block.UPDATE_ALL));
     }
 
     @Test
@@ -220,7 +262,7 @@ class LampDeviceCutoffTest {
     }
 
     @Test
-    void fertilityUsesThreeHundredRunningTicksAndRedstoneResetsTheTimer() {
+    void fertilityUsesThreeHundredActiveTicksAndPausesItsTimerWhenDisabled() {
         try (var intakes = mockConstruction(EssentiaIntake.class)) {
             var lamp = fertility(10);
             nearby(adult(EntityType.COW), adult(EntityType.COW));
@@ -235,19 +277,22 @@ class LampDeviceCutoffTest {
             CompoundTag recharged = new CompoundTag();
             recharged.putInt("charges", 10);
             lamp.loadAdditional(recharged, registries);
-            tick(lamp, 1);
-            assertEquals(5, save(lamp).getInt("charges"));
             when(level.hasNeighborSignal(BlockPos.ZERO)).thenReturn(true);
             tick(lamp, 100);
-            assertEquals(5, save(lamp).getInt("charges"));
+            assertEquals(10, save(lamp).getInt("charges"));
             when(level.hasNeighborSignal(BlockPos.ZERO)).thenReturn(false);
             tick(lamp, 1);
-            assertEquals(0, save(lamp).getInt("charges"));
-            verify(level, times(4)).getEntitiesOfClass(eq(Animal.class), any(AABB.class));
+            assertEquals(10, save(lamp).getInt("charges"));
+            tick(lamp, 298);
+            assertEquals(10, save(lamp).getInt("charges"));
+            verify(level, times(2)).getEntitiesOfClass(eq(Animal.class), any(AABB.class));
+            tick(lamp, 1);
+            assertEquals(5, save(lamp).getInt("charges"));
+            verify(level, times(3)).getEntitiesOfClass(eq(Animal.class), any(AABB.class));
             var insufficient = fertility(4);
             tick(insufficient, 301);
             assertEquals(4, save(insufficient).getInt("charges"));
-            verify(level, times(4)).getEntitiesOfClass(eq(Animal.class), any(AABB.class));
+            verify(level, times(3)).getEntitiesOfClass(eq(Animal.class), any(AABB.class));
         }
     }
 

@@ -1,4 +1,7 @@
 {
+  "loader": "thaumaturge:mesh",
+  "model": "thaumaturge:models/mesh/grapple_gun_1.ttmesh",
+  "corner_space": true,
   "textures": {
     "gun": "thaumaturge:item/grapple_gun",
     "particle": "#gun"
@@ -51,8 +54,5 @@
       ]
     }
   },
-  "ambientocclusion": false,
-  "loader": "thaumaturge:mesh",
-  "model": "thaumaturge:models/mesh/grapple_gun.ttmesh",
-  "corner_space": true
+  "ambientocclusion": false
 }
