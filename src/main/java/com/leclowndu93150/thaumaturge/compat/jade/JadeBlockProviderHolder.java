@@ -8,12 +8,13 @@ import com.leclowndu93150.thaumaturge.content.device.BlockEntityVoidSiphon;
 import com.leclowndu93150.thaumaturge.content.device.fluxscrubber.BlockEntityFluxScrubber;
 import com.leclowndu93150.thaumaturge.content.device.mirror.BlockEntityMirror;
 import com.leclowndu93150.thaumaturge.content.device.mirror.BlockEntityMirrorEssentia;
+import com.leclowndu93150.thaumaturge.content.device.sprayer.BlockEntityPotionSprayer;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchObelisk;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEntityEldritchObelisk;
 import com.leclowndu93150.thaumaturge.content.essentia.BlockEntityCentrifuge;
 import com.leclowndu93150.thaumaturge.content.essentia.advancedfurnace.BlockEntityAdvancedAlchemicalFurnace;
 import com.leclowndu93150.thaumaturge.content.essentia.crystalizer.BlockEntityEssentiaCrystalizer;
-import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJar;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.AbstractBlockEntityJar;
 import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJarBrain;
 import com.leclowndu93150.thaumaturge.content.essentia.reservoir.BlockEntityEssentiaReservoir;
 import com.leclowndu93150.thaumaturge.content.essentia.smeltery.BlockEntityAlembic;
@@ -42,7 +43,7 @@ import snownee.jade.api.BlockAccessor;
 
 final class JadeBlockProviderHolder {
     static final List<JadeBlockHandler<?>> HANDLERS = List.of(
-            new JadeBlockHandler<>(BlockEntityJar.class, JadeConfig.JARS, JadeEssentiaDetails::jar),
+            new JadeBlockHandler<>(AbstractBlockEntityJar.class, JadeConfig.JARS, JadeEssentiaDetails::jar),
             new JadeBlockHandler<>(BlockEntityJarBrain.class, JadeConfig.BRAIN_JARS, JadeEssentiaDetails::brainJar),
             new JadeBlockHandler<>(BlockEntityTubeBuffer.class, JadeConfig.BUFFERS, JadeEssentiaDetails::buffer),
             new JadeBlockHandler<>(BlockEntityTubeValve.class, JadeConfig.VALVES, JadeEssentiaDetails::valve),
@@ -80,6 +81,8 @@ final class JadeBlockProviderHolder {
                     JadeConfig.DECONSTRUCTION_TABLES,
                     JadeMachineDetails::deconstruction),
             new JadeBlockHandler<>(BlockEntitySpa.class, JadeConfig.SPAS, JadeMachineDetails::spa),
+            new JadeBlockHandler<>(
+                    BlockEntityPotionSprayer.class, JadeConfig.POTION_SPRAYERS, JadeMachineDetails::potionSprayer),
             new JadeBlockHandler<>(
                     BlockEntityEverfullUrn.class, JadeConfig.EVERFULL_URNS, (urn, data) -> data.hideFluid()),
             new JadeBlockHandler<>(

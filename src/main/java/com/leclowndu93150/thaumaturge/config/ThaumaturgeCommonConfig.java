@@ -7,14 +7,21 @@ public final class ThaumaturgeCommonConfig {
 
     public static final ModConfigSpec.BooleanValue WUSS_MODE;
     public static final ModConfigSpec.DoubleValue TAINT_SPREAD_RATE;
-    public static final ModConfigSpec.IntValue TAINT_FRONTIER_RATE;
     public static final ModConfigSpec.IntValue TAINT_SPREAD_AREA;
+    public static final ModConfigSpec.IntValue TAINT_FEED_RADIUS;
+    public static final ModConfigSpec.DoubleValue TAINT_FEED_RATE;
+    public static final ModConfigSpec.DoubleValue TAINT_RESERVE_CAP;
+    public static final ModConfigSpec.DoubleValue TAINT_GROWTH_COST;
+    public static final ModConfigSpec.DoubleValue TAINT_CHILD_SEED_COST;
+    public static final ModConfigSpec.IntValue TAINT_STARVE_TICKS;
+    public static final ModConfigSpec.DoubleValue TAINTED_LANDS_STARTING_FLUX;
     public static final ModConfigSpec.BooleanValue TAINT_FROM_FLUX;
     public static final ModConfigSpec.BooleanValue PHYSICAL_FLUX_AURA_FLOOR;
     public static final ModConfigSpec.BooleanValue PHYSICAL_FLUX_TAINT_OUTBREAKS;
     public static final ModConfigSpec.BooleanValue FLUX_PRESSURE_EVENTS;
     public static final ModConfigSpec.DoubleValue ENERGIZED_NODE_VIS_PER_POINT;
     public static final ModConfigSpec.IntValue CRIMSON_PORTAL_RARITY;
+    public static final ModConfigSpec.DoubleValue CRIMSON_PATROL_CHANCE;
     public static final ModConfigSpec.DoubleValue WILD_NODE_CHANCE;
     public static final ModConfigSpec.DoubleValue MAGICAL_NODE_CHANCE;
     public static final ModConfigSpec.DoubleValue EERIE_NODE_CHANCE;
@@ -24,10 +31,14 @@ public final class ThaumaturgeCommonConfig {
     public static final ModConfigSpec.DoubleValue PURE_NODE_CHANCE;
     public static final ModConfigSpec.DoubleValue TAINTED_NODE_CHANCE;
     public static final ModConfigSpec.DoubleValue HUNGRY_NODE_CHANCE;
-    public static final ModConfigSpec.IntValue HUNGRY_NODE_BLOCK_EAT_RANGE;
-    public static final ModConfigSpec.BooleanValue SCALE_HUNGRY_NODE_RANGE_BY_MODIFIER;
-    public static final ModConfigSpec.IntValue HUNGRY_NODE_MINIMUM_BLOCK_EAT_RANGE;
-    public static final ModConfigSpec.IntValue HUNGRY_NODE_MAXIMUM_BLOCK_EAT_RANGE;
+    public static final ModConfigSpec.BooleanValue HUNGRY_NODE_EATS_BLOCKS;
+    public static final ModConfigSpec.BooleanValue HUNGRY_NODE_EATS_ENTITIES;
+    public static final ModConfigSpec.BooleanValue HUNGRY_NODE_PULLS_PLAYERS;
+    public static final ModConfigSpec.BooleanValue HUNGRY_NODE_DAMAGES_PLAYERS;
+    public static final ModConfigSpec.IntValue HUNGRY_NODE_EAT_RANGE;
+    public static final ModConfigSpec.BooleanValue SCALE_HUNGRY_NODE_EAT_RANGE_BY_MODIFIER;
+    public static final ModConfigSpec.IntValue HUNGRY_NODE_MINIMUM_EAT_RANGE;
+    public static final ModConfigSpec.IntValue HUNGRY_NODE_MAXIMUM_EAT_RANGE;
     public static final ModConfigSpec.DoubleValue HUNGRY_NODE_BLOCK_HARDNESS;
     public static final ModConfigSpec.IntValue HUNGRY_NODE_BLOCK_EAT_INTERVAL;
     public static final ModConfigSpec.IntValue SHIELD_RECHARGE;
@@ -48,26 +59,39 @@ public final class ThaumaturgeCommonConfig {
 
         builder.push("world");
 
-        WUSS_MODE = builder.comment(
-                        "Turns off the harsher side of the mod. While on: no warp is gained from any source and warp events stop; taint fibres, taint seeds and taint creatures stop spreading, the Tainted Lands biome and its landmarks stop spreading, and mobs are no longer infected; wild nodes never generate tainted, even in the Tainted Lands; flux pressure events stop and Flux Rifts are not started by their triggers; Flux Goo no longer festers into taint and physical flux cannot start a taint outbreak.")
+        WUSS_MODE = builder.comment("Setting this to true disables Warp, Taint spread and similar mechanics. You wuss.")
                 .define("wussMode", false);
         TAINT_SPREAD_RATE = builder.comment(
-                        "Percentage chance, from 0 to 100, that a taint fibre goes ahead with a spread attempt when it gets a block tick. Forced spreads skip this roll. 0 stops ordinary fibre spread.")
+                        "The % chance of taint fibres spreading on a block tick. Setting this to 0 will effectively stop taint fibre spread.")
                 .defineInRange("taintSpreadRate", 100.0, 0.0, 100.0);
-        TAINT_FRONTIER_RATE = builder.comment(
-                        "How quickly the Tainted Lands biome spreads outward. Fibrous taint tries to take over a neighbouring column with a chance of 1 in (taintFrontierRate * 5) per random tick, and only with at least two adjacent taint blocks. Higher is slower. 0 stops the biome from spreading while existing taint stays active.")
-                .defineInRange("taintFrontierRate", 200, 0, 100000);
         TAINT_SPREAD_AREA = builder.comment(
-                        "Base radius in blocks around a taint seed that its taint may spread into. Other seeds inside this radius count as crowding it. The local flux level adjusts the radius further.")
+                        "The range in blocks that a taint origin (a taint seed or a tainted node) claims. Taint outside the range of every living origin decays, except inside naturally generated Tainted Lands.")
                 .defineInRange("taintSpreadArea", 32, 1, 128);
-        TAINT_FROM_FLUX = builder.comment(
-                        "Allows deep, exposed Flux Goo to develop into Fibrous Taint and Tainted Lands.")
+        TAINT_FEED_RADIUS = builder.comment("How many chunks around itself a taint origin can eat flux from.")
+                .defineInRange("taintFeedRadius", 2, 0, 8);
+        TAINT_FEED_RATE = builder.comment("Flux a taint origin eats from the aura each second.")
+                .defineInRange("taintFeedRate", 5.0, 0.0, 1000.0);
+        TAINT_RESERVE_CAP = builder.comment("Most flux a taint origin can store for growth.")
+                .defineInRange("taintReserveCap", 100.0, 1.0, 100000.0);
+        TAINT_GROWTH_COST = builder.comment(
+                        "Stored flux a taint origin spends for each block of taint it grows. A chunk polluted up to its base aura pays for roughly one chunk of taint at the default.")
+                .defineInRange("taintGrowthCost", 1.0, 0.0, 1000.0);
+        TAINT_CHILD_SEED_COST = builder.comment(
+                        "Stored flux a well fed taint origin spends to sprout a new taint seed at the edge of its range.")
+                .defineInRange("taintChildSeedCost", 25.0, 0.0, 100000.0);
+        TAINT_STARVE_TICKS = builder.comment(
+                        "Ticks a taint seed survives with nothing to eat before it withers away. A tainted node inside an Ethereal Bloom's range is purified after the same time.")
+                .defineInRange("taintStarveTicks", 12000, 20, 1000000);
+        TAINTED_LANDS_STARTING_FLUX = builder.comment(
+                        "Flux a freshly generated Tainted Lands chunk starts with, as a multiple of its base aura. The tainted nodes and seeds there feed on it. 0 leaves Tainted Lands dormant until flux reaches them.")
+                .defineInRange("taintedLandsStartingFlux", 1.0, 0.0, 10.0);
+        TAINT_FROM_FLUX = builder.comment("Allows deep, exposed Flux Goo to fester into a taint seed.")
                 .define("taintFromFlux", true);
         PHYSICAL_FLUX_AURA_FLOOR = builder.comment(
                         "Allows physical Flux Goo and Gas to sustain a capped minimum Aura Flux in their chunk. Disabling this does not remove physical Flux.")
                 .define("physicalFluxAuraFloor", true);
         PHYSICAL_FLUX_TAINT_OUTBREAKS = builder.comment(
-                        "Allows large accumulations of Flux Goo and Gas to trigger taint outbreaks independently of individual Goo blocks.")
+                        "Allows large accumulations of Flux Goo and Gas to sprout a taint seed independently of individual Goo blocks.")
                 .define("physicalFluxTaintOutbreaks", true);
         FLUX_PRESSURE_EVENTS = builder.comment(
                         "Allows high Aura Flux to trigger Flux-pressure events. Disabling this does not affect Flux Rifts.")
@@ -76,8 +100,11 @@ public final class ThaumaturgeCommonConfig {
                         "Aura Vis consumed per aspect point restored by an energized node. Higher values increase consumption; 0 makes recharging free.")
                 .defineInRange("energizedNodeVisPerPoint", 6.0, 0.0, 100.0);
         CRIMSON_PORTAL_RARITY = builder.comment(
-                        "Average chunks per naturally generated lesser Crimson Portal. Higher values make portals rarer; 0 disables natural generation.")
-                .defineInRange("crimsonPortalRarity", 500, 0, 1000000);
+                        "Average chunks per naturally generated lesser Crimson Portal. Higher values make portals rarer; 0, the default, disables natural generation and crimson ranger patrols open portals instead.")
+                .defineInRange("crimsonPortalRarity", 0, 0, 1000000);
+        CRIMSON_PATROL_CHANCE = builder.comment(
+                        "Chance from 0 to 100 that a crimson ranger patrol spawns near a random overworld player at each daytime attempt, about every 10 minutes from day 5 on. 0 disables patrols.")
+                .defineInRange("crimsonPatrolChance", 10.0, 0.0, 100.0);
 
         builder.push("nodes");
 
@@ -114,17 +141,28 @@ public final class ThaumaturgeCommonConfig {
 
         builder.pop(2);
 
-        HUNGRY_NODE_BLOCK_EAT_RANGE = builder.comment(
-                        "Maximum block-eating ray length in blocks. Dropped items are pulled from this range plus half a block; the entity pulling range is not affected.")
+        HUNGRY_NODE_EATS_BLOCKS =
+                builder.comment("Allows hungry nodes to destroy edible blocks.").define("hungryNodeEatsBlocks", true);
+        HUNGRY_NODE_EATS_ENTITIES = builder.comment(
+                        "Allows hungry nodes to pull in and consume entities, including dropped items.")
+                .define("hungryNodeEatsEntities", true);
+        HUNGRY_NODE_PULLS_PLAYERS = builder.comment(
+                        "Allows hungry nodes to pull players toward them. Disabling this does not prevent damage to players who enter the maw.")
+                .define("hungryNodePullsPlayers", true);
+        HUNGRY_NODE_DAMAGES_PLAYERS = builder.comment(
+                        "Allows hungry nodes to damage and consume players that reach the maw. Creative and spectator players are excluded. Does not control player pulling.")
+                .define("hungryNodeDamagesPlayers", true);
+        HUNGRY_NODE_EAT_RANGE = builder.comment(
+                        "Maximum range in blocks for hungry node block eating and entity pulling. Dropped items are pulled from this range plus half a block.")
                 .defineInRange("hungryNodeBlockEatRange", 16, 1, 64);
-        SCALE_HUNGRY_NODE_RANGE_BY_MODIFIER = builder.comment(
-                        "Scales hungry node block-eating range by quality. Uses the minimum and maximum ranges below instead of the fixed range.")
+        SCALE_HUNGRY_NODE_EAT_RANGE_BY_MODIFIER = builder.comment(
+                        "Scales hungry node range by quality. Uses the minimum and maximum ranges below instead of the fixed range.")
                 .define("scaleHungryNodeBlockEatRangeByModifier", false);
-        HUNGRY_NODE_MINIMUM_BLOCK_EAT_RANGE = builder.comment(
-                        "Block-eating range for fading hungry nodes when quality scaling is enabled. Ignored when scaling is disabled.")
+        HUNGRY_NODE_MINIMUM_EAT_RANGE = builder.comment(
+                        "Range for fading hungry nodes when quality scaling is enabled. Ignored when scaling is disabled.")
                 .defineInRange("hungryNodeMinimumBlockEatRange", 16, 1, 64);
-        HUNGRY_NODE_MAXIMUM_BLOCK_EAT_RANGE = builder.comment(
-                        "Block-eating range for bright hungry nodes when quality scaling is enabled. Values below the minimum use the minimum for all qualities.")
+        HUNGRY_NODE_MAXIMUM_EAT_RANGE = builder.comment(
+                        "Range for bright hungry nodes when quality scaling is enabled. Values below the minimum use the minimum for all qualities.")
                 .defineInRange("hungryNodeMaximumBlockEatRange", 32, 1, 64);
         HUNGRY_NODE_BLOCK_HARDNESS = builder.comment(
                         "Maximum edible block hardness (exclusive). Default: 5; obsidian is 50. 0 disables block destruction. Unbreakable blocks are excluded.")
@@ -142,7 +180,7 @@ public final class ThaumaturgeCommonConfig {
                 .defineInRange("shieldCost", 1.0, 0.0, 100.0);
         ALLOW_CHAMPION_MOBS = builder.comment("Allows champion mobs to spawn.").define("allowChampionMobs", true);
         NO_SLEEP = builder.comment(
-                        "If true, a player gets the Dream Journal and its research as soon as they pick up their first vis crystal, without having to sleep for the first dream.")
+                        "Setting this to true will make you get the recipe book for salis mundus without having to sleep first.")
                 .define("noSleep", false);
 
         builder.pop();
@@ -155,7 +193,7 @@ public final class ThaumaturgeCommonConfig {
         builder.push("golems");
 
         SHOW_GOLEM_EMOTES = builder.comment(
-                        "Whether golems show small emote particles when they take an order or run into a problem.")
+                        "Will golems display emote particles if they receive orders or encounter problems.")
                 .define("showGolemEmotes", true);
 
         builder.pop();

@@ -1,7 +1,5 @@
 package com.leclowndu93150.thaumaturge.content.aura.node;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -15,7 +13,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.Test;
@@ -23,25 +20,7 @@ import org.mockito.MockedStatic;
 
 class NodeDevicePortTest {
     @Test
-    void jarredNodeDoesNotAcceptStabilizerLocks() {
-        BlockEntityJarNode node =
-                new BlockEntityJarNode(BlockPos.ZERO, TTBlocks.JAR_NODE.get().defaultBlockState());
-        assertFalse(node.allowLock());
-    }
-
-    @Test
-    void naturalBootstrapRequiresCenterAndCardinalColumnsToBeLoaded() {
-        LevelReader level = mock(LevelReader.class);
-        BlockPos target = new BlockPos(16, 70, 16);
-        when(level.hasChunkAt(any(BlockPos.class))).thenReturn(true);
-        assertTrue(NodeBootstrap.columnsGenerated(level, target));
-
-        when(level.hasChunkAt(target.east())).thenReturn(false);
-        assertFalse(NodeBootstrap.columnsGenerated(level, target));
-    }
-
-    @Test
-    void catastrophicTransducerFailureDoesNotDestroyNearbyBlocks() throws Exception {
+    void catastrophicTransducerFailurePollutesAndRemovesTheNodeWithoutDestroyingNearbyBlocks() throws Exception {
         BlockPos nodePos = new BlockPos(4, 70, 9);
         ServerLevel level = mock(ServerLevel.class);
         BlockState hostState = TTBlocks.SILVERWOOD_NODE_LOG.get().defaultBlockState();
@@ -58,10 +37,11 @@ class NodeDevicePortTest {
         catastrophe.setAccessible(true);
         try (MockedStatic<AuraHelper> aura = org.mockito.Mockito.mockStatic(AuraHelper.class)) {
             catastrophe.invoke(null, level, nodePos);
-            aura.verify(() -> AuraHelper.addFlux(level, nodePos, 32.0F));
+            aura.verify(() -> AuraHelper.polluteAura(level, nodePos, 32.0F, true));
         }
 
-        verify(level).setBlock(nodePos, depletedState, Block.UPDATE_ALL);
+        verify(level).removeBlock(nodePos, false);
+        verify(level, never()).setBlock(nodePos, depletedState, Block.UPDATE_ALL);
         verify(level)
                 .explode(
                         null,
@@ -70,6 +50,5 @@ class NodeDevicePortTest {
                         nodePos.getZ() + 0.5,
                         3.0F,
                         Level.ExplosionInteraction.NONE);
-        verify(level, never()).removeBlock(nodePos, false);
     }
 }

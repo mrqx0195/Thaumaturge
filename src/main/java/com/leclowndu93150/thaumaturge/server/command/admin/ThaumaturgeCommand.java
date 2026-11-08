@@ -21,6 +21,8 @@ public final class ThaumaturgeCommand {
         LiteralArgumentBuilder<CommandSourceStack> root = TTCommandRoot.root();
         List<AdminSubcommand> subcommands = List.of(
                 new ResearchSubcommand(),
+                new ScanSubcommand(),
+                new PatrolSubcommand(),
                 new KnowledgeSubcommand(),
                 new AspectSubcommand(),
                 PlacementSubcommand.structures(),

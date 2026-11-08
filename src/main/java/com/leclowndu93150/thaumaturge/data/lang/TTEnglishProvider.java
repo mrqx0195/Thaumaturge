@@ -5,6 +5,7 @@ import com.leclowndu93150.thaumaturge.api.golems.GolemTrait;
 import com.leclowndu93150.thaumaturge.api.golems.parts.GolemMaterial;
 import com.leclowndu93150.thaumaturge.api.golems.parts.GolemPart;
 import com.leclowndu93150.thaumaturge.data.labyrinth.LabyrinthEncounterBootstrap;
+import com.leclowndu93150.thaumaturge.data.trim.TTTrimBootstrap;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.data.LanguageProvider;
@@ -41,9 +42,9 @@ public final class TTEnglishProvider extends LanguageProvider {
         aspect("praecantatio", "Praecantatio", "Structured Magic, Spells, Enchantment", "magical things");
         aspect("auram", "Auram", "Aura, Vis", "the aura");
         aspect("alkimia", "Alkimia", "Alchemy, Chemistry", "alchemy");
-        aspect("vitium", "Vitium", "Taint, Change, Mutation", "corrupted things");
+        aspect("vitium", "Vitium", "Taint, Change, Mutation", "taint and flux");
         aspect("tenebrae", "Tenebrae", "Darkness", "darkness");
-        aspect("alienis", "Alienis", "Alien, Strange, The Eldritch", "otherworldly things");
+        aspect("alienis", "Alienis", "Alien, Strange, The Eldritch", "things from beyond this world");
         aspect("volatus", "Volatus", "Flight", "flight");
         aspect("herba", "Herba", "Plant", "plants");
         aspect("instrumentum", "Instrumentum", "Tool, Instrument", "tools");
@@ -94,19 +95,11 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("tooltip.thaumaturge.research.stage_short", "%1$s / %2$s");
         add("tooltip.thaumaturge.research.not_begun", "You have not yet begun this research");
         add("tooltip.thaumaturge.research.missing", "Missing required research:");
-        add("tooltip.thaumaturge.research.new_research", "§6Newly discovered research§0");
-        add("tooltip.thaumaturge.research.new_page", "§aNew page added§0");
+        add("tooltip.thaumaturge.research.new_research", "Newly discovered research");
+        add("tooltip.thaumaturge.research.new_page", "New page added");
         add("gui.thaumaturge.thaumonomicon.search", "Search");
         add("treePack.thaumaturge.name", "Thaumaturge");
         add("pack.thaumaturge.dynamic_trees", "Thaumaturge Dynamic Trees");
-        add("block.thaumaturge.greatwood_branch", "Greatwood Tree");
-        add("item.thaumaturge.greatwood_branch", "Greatwood Tree");
-        add("item.thaumaturge.greatwood_seed", "Greatwood Seed");
-        add("species.thaumaturge.greatwood", "Greatwood");
-        add("block.thaumaturge.silverwood_branch", "Silverwood Tree");
-        add("item.thaumaturge.silverwood_branch", "Silverwood Tree");
-        add("item.thaumaturge.silverwood_seed", "Silverwood Seed");
-        add("species.thaumaturge.silverwood", "Silverwood");
         add("gui.thaumaturge.thaumonomicon.search_more", "...too many results found. Refine your search");
         add("gui.thaumaturge.research_table.no_ink.0", "You have run out of ink!");
         add("gui.thaumaturge.research_table.no_ink.1", "Refill your scribing tools.");
@@ -124,20 +117,31 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("gui.thaumaturge.thaumonomicon.warp_level.4", "Dangerous");
         add("gui.thaumaturge.thaumonomicon.warp_level.5", "Taboo");
         add("gui.thaumaturge.recipe.instability", "Instability: ");
-        add("gui.thaumaturge.recipe.instability.0", "§1Negligible§0");
-        add("gui.thaumaturge.recipe.instability.1", "§9Minor§0");
-        add("gui.thaumaturge.recipe.instability.2", "§5Moderate§0");
-        add("gui.thaumaturge.recipe.instability.3", "§eHigh§0");
-        add("gui.thaumaturge.recipe.instability.4", "§6Very High§0");
-        add("gui.thaumaturge.recipe.instability.5", "§4Dangerous§0");
+        add("gui.thaumaturge.recipe.instability.0", "Negligible");
+        add("gui.thaumaturge.recipe.instability.1", "Minor");
+        add("gui.thaumaturge.recipe.instability.2", "Moderate");
+        add("gui.thaumaturge.recipe.instability.3", "High");
+        add("gui.thaumaturge.recipe.instability.4", "Very High");
+        add("gui.thaumaturge.recipe.instability.5", "Dangerous");
         add("gui.thaumaturge.thaumonomicon.back", "Back");
         add("gui.thaumaturge.thaumonomicon.return_to_map", "Back to Research Map");
+        add("gui.thaumaturge.thaumonomicon.return_control", "Return");
+        add("gui.thaumaturge.thaumonomicon.return_control.description", "Close the insert or return to the map.");
         add("gui.thaumaturge.recipe.unknown", "You cannot craft this yet");
         add("gui.thaumaturge.recipe_type.workbench", "Workbench");
         add("gui.thaumaturge.recipe_type.workbench_shapeless", "Workbench (Shapeless)");
         add("gui.thaumaturge.recipe_type.arcane", "Arcane Workbench");
         add("gui.thaumaturge.recipe_type.arcane_shapeless", "Arcane Workbench (Shapeless)");
         add("gui.thaumaturge.recipe_type.crucible", "Crucible");
+        add("gui.thaumaturge.recipe_type.smithing", "Smithing Table");
+        add("trim_material.thaumaturge.brass", "Brass Material");
+        add("trim_material.thaumaturge.thaumium", "Thaumium Material");
+        add("trim_material.thaumaturge.void_metal", "Void Metal Material");
+        add(TTTrimBootstrap.CRYSTAL_DESCRIPTION_KEY, "Vis Crystal Material");
+        add("trim_pattern.thaumaturge.arcane", "Arcane Armor Trim");
+        add("trim_pattern.thaumaturge.occult", "Occult Armor Trim");
+        add("item.thaumaturge.arcane_armor_trim_smithing_template", "Arcane Armor Trim");
+        add("item.thaumaturge.occult_armor_trim_smithing_template", "Occult Armor Trim");
         add("gui.thaumaturge.recipe_type.infusion", "Arcane Infusion");
         add("gui.thaumaturge.recipe_type.infusion_enchantment", "Infusion Enchantment");
         add("tooltip.thaumaturge.charge", "Vis: %s / %s");
@@ -164,8 +168,8 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("message.thaumaturge.research_note.learned", "You have completed your research on %s!");
         add(
                 "message.thaumaturge.research_note.missing_tools",
-                "You need scribing tools with ink to spare and a sheet of paper to write research notes");
-        add("message.thaumaturge.research.aspect_discovered", "New aspect discovered: %s");
+                "Writing a research note takes scribing tools with ink and a sheet of paper");
+        add("message.thaumaturge.research.aspect_discovered", "You have discovered the aspect %s!");
         add("message.thaumaturge.research.discovery_error", "To understand this you need to study %1$s.");
         add("gui.thaumaturge.thaumonomicon.research_cost", "Required research points:");
         add("gui.thaumaturge.research_table.copy", "Duplicate these research notes");
@@ -173,6 +177,7 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("gui.thaumaturge.research_table.combine", "Combine the two aspects into their compound");
         add("gui.thaumaturge.research_table.helper", "Aspect combination reference");
         add("message.thaumaturge.device.not_understood", "You do not yet understand how this device works.");
+        add("message.thaumaturge.infusion.research_locked", "This infusion needs the research \"%s\" first.");
         add("gui.thaumaturge.research_table.select", "Drag an aspect here to combine it");
         add("gui.thaumaturge.research_table.page_prev", "Previous page");
         add("gui.thaumaturge.research_table.page_next", "Next page");
@@ -184,28 +189,28 @@ public final class TTEnglishProvider extends LanguageProvider {
                 "There must be a more efficient way to work through my research notes. If I complete another theory I am sure I can find ways to recover some of the research points I expend.");
         add(
                 "research.thaumaturge.research_expertise.stage.2",
-                "A careful hand can recover some of what a mistake costs. Whenever I erase an aspect from a research note, there is now a one in four chance that the research point I spent on it comes back to me.");
+                "My studies are paying off. When I make a mistake on a research note and erase an aspect, I now get the point back about one time in four, so false starts cost me less.");
         add("research.thaumaturge.research_mastery.title", "Research Mastery");
         add(
                 "research.thaumaturge.research_mastery.stage.1",
                 "My expertise has grown, but true mastery of the research process still eludes me. More theory work should get me there, though I fear what prolonged exposure to these mysteries is doing to my mind.");
         add(
                 "research.thaumaturge.research_mastery.stage.2",
-                "My grasp of the research process is as complete as a mortal mind can manage. When I erase an aspect from a note I get its research point back half the time, and about one time in ten an aspect I write costs me nothing at all.<BR>I can also shift-click a compound aspect at the research table to combine its components in one step.");
+                "I understand the craft of research far better now. Erasing an aspect from a note returns the point half the time, and now and then an aspect I place costs me nothing at all.<BR>I can also shift-click a compound aspect at the research table to combine its two components into it in one step.");
         add("research.thaumaturge.research_duplication.title", "Research Duplication");
         add(
                 "research.thaumaturge.research_duplication.stage.1",
                 "A completed discovery holds its pattern permanently. Surely I could copy one onto fresh paper for a colleague, given enough research points and one more theory to work out the method.");
         add(
                 "research.thaumaturge.research_duplication.stage.2",
-                "I can now copy a finished research note. With a completed note in the research table and a sheet of paper in my pack, I can write out a duplicate, using a little ink and paying the note's aspects from my research points. Every further copy of the same note costs one more point of each of those aspects.");
+                "Once a research note is complete, the research table now offers to duplicate it. Each copy needs a sheet of paper, some ink and the note's aspects, and every further copy of the same note costs a little more than the last.<BR>A copied note teaches its theory to anyone who has not learned it yet, so I can share my discoveries with other thaumaturges.");
         add("research.thaumaturge.deconstructor.title", "Deconstruction Table");
         add(
                 "research.thaumaturge.deconstructor.stage.1",
                 "Breaking things apart to see what makes them tick has always come naturally to me. A purpose-built table should let me reduce objects to their base essences and salvage research points from the wreckage.");
         add(
                 "research.thaumaturge.deconstructor.stage.2",
-                "I have designed a Deconstruction Table. Items placed on it are broken down one at a time, one every two seconds. Often nothing useful survives, but sometimes a primal aspect is left behind on the table, and the richer an item is in aspects the better the odds. Collecting that aspect adds a point of it to my research points.");
+                "The Deconstruction Table breaks down any item with aspects that I place inside. Every couple of seconds it consumes the item and reduces its aspects to their primal roots. Items rich in aspects almost always leave a primal behind, while poor ones often leave nothing.<BR>When an aspect appears above the table, I click it to add that primal to my research pool. The table waits until I do.");
         add("gui.thaumaturge.research_table.inspiration", "Inspiration: %s");
         add("gui.thaumaturge.research_table.draw", "Draw");
         add("gui.thaumaturge.research_table.play", "Play");
@@ -253,6 +258,7 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("block.thaumaturge.smelter_vent", "Auxiliary Venting Port");
         add("block.thaumaturge.jar_normal", "Warded Jar");
         add("block.thaumaturge.jar_void", "Void Jar");
+        add("block.thaumaturge.jar_creative", "Creative Jar");
         add("item.thaumaturge.thaumonomicon", "Thaumonomicon");
         add("item.thaumaturge.thaumonomicon_cheat", "Cheater's Thaumonomicon");
         add("item.thaumaturge.thaumonomicon_sharing", "Thaumonomicon of Sharing");
@@ -297,6 +303,7 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("block.thaumaturge.liquid_death", "Liquid Death");
         add("fluid_type.thaumaturge.liquid_death", "Liquid Death");
         add("item.thaumaturge.liquid_death_bucket", "Liquid Death Bucket");
+        add("item.thaumaturge.flux_goo_bucket", "Flux Goo Bucket");
         add("item.thaumaturge.purifying_bucket", "Bucket of Purifying Fluid");
         add("gui.thaumaturge.spa.mix.true", "Mix with ingredient");
         add("gui.thaumaturge.spa.mix.false", "Use just the fluid");
@@ -438,6 +445,7 @@ public final class TTEnglishProvider extends LanguageProvider {
         langBaubles();
         langCStone();
         langDTrees();
+        langDynamicTrees();
         langEPlants();
         langMAuraHud();
         langHContainers();
@@ -599,6 +607,23 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("block.thaumaturge.plank_silverwood", "Silverwood Planks");
     }
 
+    private void langDynamicTrees() {
+        add("block.dynamictrees.greatwood_branch", "Greatwood Tree");
+        add("block.dynamictrees.silverwood_branch", "Silverwood Tree");
+        add("block.dynamictrees.stripped_greatwood_branch", "Stripped Greatwood Tree");
+        add("block.dynamictrees.stripped_silverwood_branch", "Stripped Silverwood Tree");
+        add("block.dynamictrees.greatwood_leaves", "Greatwood Leaves");
+        add("block.dynamictrees.silverwood_leaves", "Silverwood Leaves");
+        add("block.dynamictrees.greatwood_sapling", "Greatwood Sapling");
+        add("block.dynamictrees.silverwood_sapling", "Silverwood Sapling");
+        add("item.dynamictrees.greatwood_branch", "Greatwood Tree");
+        add("item.dynamictrees.silverwood_branch", "Silverwood Tree");
+        add("item.dynamictrees.greatwood_seed", "Greatwood Seed");
+        add("item.dynamictrees.silverwood_seed", "Silverwood Seed");
+        add("species.thaumaturge.greatwood", "Greatwood");
+        add("species.thaumaturge.silverwood", "Silverwood");
+    }
+
     private void langEPlants() {
 
         add("block.thaumaturge.shimmerleaf", "Shimmerleaf");
@@ -683,6 +708,8 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("entity.thaumaturge.bottle_taint", "Bottle of Tainted Goo");
         add("item.thaumaturge.bottle_taint", "Bottle of Taint");
         add("item.thaumaturge.tainted_goo", "Tainted Goo");
+        add("item.thaumaturge.tainted_egg", "Tainted Egg");
+        add("entity.thaumaturge.tainted_egg", "Tainted Egg");
         add("item.thaumaturge.taint_tendril", "Taint Tendril");
         add("entity.thaumaturge.wisp", "Wisp");
         add("entity.thaumaturge.brainy_zombie", "Angry Zombie");
@@ -858,11 +885,11 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("research.thaumaturge.enter_outer_lands.title", "The Outer Lands");
         add(
                 "research.thaumaturge.enter_outer_lands.stage_0",
-                "I have passed through the Eye and come out somewhere that should not exist. There is no ground and no sky, only darkness, and hanging in it a vast labyrinth of ancient stone.<BR>The portal that brought me here is still behind me, and stepping back into it should take me home.<BR>The labyrinth is not empty. Somewhere in its halls a reliquary keeps a runed tablet, and I believe that tablet is meant for the great lock that seals the deepest hall. Whatever waits beyond that lock was put there to stay.");
+                "I have stepped through the portal and into somewhere else entirely. The air is still, the stone is old and cut with a purpose I cannot read, and the light comes from nowhere in particular. Whoever built this place has been gone a long time, or so I hope.<BR>I should tread carefully and record everything I find.");
         add("research.thaumaturge.outer_revelations.title", "Outer Revelations");
         add(
                 "research.thaumaturge.outer_revelations.stage_0",
-                "Strange crystals push out of the stone in the darker corners of this place, and some of the crust here glows with a light of its own. Neither came from any world I know.<BR>Studying them closely has shaken me. They resonate with the same energies as the obelisks and the Eye, as though this labyrinth were grown rather than built, and is growing still. I am beginning to suspect the Outer Lands are the inside of something far larger.");
+                "The crystals growing from the stone here, and the crust that glows along the walls, are not decoration. Scanning them, I sense the same alien quality I have found in ender pearls and the things of the End, only far stronger and far older.<BR>This place was not built by anyone from my world. Whatever its makers wanted from it, they wanted it badly enough to wall it away.");
         add(
                 "gui.thaumaturge.altar.ritual_unknown",
                 "The keystone hums with power, but its purpose escapes you... for now.");
@@ -934,6 +961,12 @@ public final class TTEnglishProvider extends LanguageProvider {
                 "Encounter %s (forced %s): %s bound, %s defeated, scaled for %s; boss hall %s to %s");
         add("commands.thaumaturge.labyrinth.retire.success", "Retired labyrinth %s");
         add("commands.thaumaturge.labyrinth.restamp.success", "Queued %s loaded chunks of labyrinth %s for rebuilding");
+        add(
+                "commands.thaumaturge.labyrinth.regenerate.success",
+                "Rebuilt labyrinth %s with a new layout, generation %s");
+        add(
+                "commands.thaumaturge.labyrinth.regenerate.failed",
+                "The labyrinth could not be rebuilt. Check the server log.");
         add("commands.thaumaturge.labyrinth.portal.success", "Opened a portal into labyrinth %s at %s");
         add("commands.thaumaturge.labyrinth.phase.success", "Labyrinth %s is now %s");
         add("commands.thaumaturge.labyrinth.phase.unknown", "Unknown phase %s");
@@ -1042,6 +1075,9 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("item.thaumaturge.thaumium_legs", "Thaumium Greaves");
         add("item.thaumaturge.thaumium_boots", "Thaumium Boots");
         add("item.thaumaturge.void_sword", "Void Sword");
+        add("item.thaumaturge.thaumium_shield", "Thaumium Shield");
+        add("item.thaumaturge.mirror_shield", "Mirror Shield");
+        add("item.thaumaturge.void_shield", "Void Shield");
         add("item.thaumaturge.void_pickaxe", "Void Pickaxe");
         add("item.thaumaturge.void_axe", "Void Axe");
         add("item.thaumaturge.void_shovel", "Void Shovel");
@@ -1172,8 +1208,9 @@ public final class TTEnglishProvider extends LanguageProvider {
                 "The dust sparkles with promise, but you lack the knowledge to direct it");
         add("message.thaumaturge.arcane_workbench.staff", "A staff is too unwieldy to use at the workbench");
         add("tooltip.thaumaturge.wand.capacity", "Capacity %s");
-        add("tooltip.thaumaturge.wand.cost", "Vis cost %s%%");
-        add("tooltip.thaumaturge.wand.cost.except", "Vis cost %1$s%% (%2$s)");
+        add("tooltip.thaumaturge.wand.discount", "Vis discount: %s%%");
+        add("tooltip.thaumaturge.wand.discount.aspects", "Vis discount: %s");
+        add("tooltip.thaumaturge.wand.discount.aspect", "%1$s: %2$s%%");
         add("item.thaumaturge.wand_cap_iron", "Iron Cap");
         add("item.thaumaturge.wand_cap_copper", "Copper Cap");
         add("item.thaumaturge.wand_cap_gold", "Gold Cap");
@@ -1202,10 +1239,10 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("item.thaumaturge.staff_rod_primal", "Staff Core of the Primal");
         add("item.thaumaturge.primal_charm", "Primal Charm");
         add("tooltip.thaumaturge.primal_charm.0", "It seems to be leaking");
-        add("tooltip.thaumaturge.primal_charm.1", "It hums faintly in your hand");
-        add("tooltip.thaumaturge.primal_charm.2", "Six colours swirl beneath its surface");
-        add("tooltip.thaumaturge.primal_charm.3", "It is warm on one side and cold on the other");
-        add("tooltip.thaumaturge.primal_charm.4", "You could swear it just moved");
+        add("tooltip.thaumaturge.primal_charm.1", "Six colours chase each other through it");
+        add("tooltip.thaumaturge.primal_charm.2", "It hums faintly against your palm");
+        add("tooltip.thaumaturge.primal_charm.3", "Warm on one side, cold on the other");
+        add("tooltip.thaumaturge.primal_charm.4", "Something inside it wants to be whole");
         add("item.thaumaturge.focus_1", "Blank Lesser Focus");
         add("item.thaumaturge.focus_2", "Blank Advanced Focus");
         add("item.thaumaturge.focus_3", "Blank Greater Focus");
@@ -1333,6 +1370,7 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("block.thaumaturge.placeholder_anvil", "Anvil");
         add("block.thaumaturge.placeholder_table", "Stone Table");
         add("entity.thaumaturge.golem", "Thaumaturge Golem");
+        add("entity.thaumaturge.golem.material", "%s Golem");
         add("entity.thaumaturge.golem_dart", "Golem Dart");
         add("message.thaumaturge.golem.follow", "I'm coming, Master!");
         add("message.thaumaturge.golem.stay", "I will stay here, Master.");
@@ -1537,8 +1575,6 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("tooltip.thaumaturge.focus.with_settings", "%s [%s]");
         add("tooltip.thaumaturge.focus.setting", "%s %s");
         add("tooltip.thaumaturge.list", "%s, %s");
-        add("tooltip.thaumaturge.wand.cost.group", "%s %s%%");
-        add("tooltip.thaumaturge.wand.cost.groups", "%s; %s");
         add("tooltip.thaumaturge.golem.rank", "%s %s");
         add("tooltip.thaumaturge.golem.rank_progress", "%s %s");
         add("tooltip.thaumaturge.golem.xp", "(%s/%s)");
@@ -1649,6 +1685,8 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("entity.thaumaturge.eldritch_guardian", "Eldritch Guardian");
         add("entity.thaumaturge.cultist_knight", "Crimson Knight");
         add("entity.thaumaturge.cultist_cleric", "Crimson Cleric");
+        add("entity.thaumaturge.cultist_ranger", "Crimson Ranger");
+        add("entity.thaumaturge.cultist_ranger_captain", "Crimson Ranger Captain");
         add("entity.thaumaturge.cultist_portal_lesser", "Lesser Crimson Portal");
         add("entity.thaumaturge.eldritch_orb", "Eldritch Orb");
         add("entity.thaumaturge.golem_orb", "Arcane Orb");
@@ -1658,6 +1696,8 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("item.thaumaturge.eldritch_guardian_spawn_egg", "Eldritch Guardian Spawn Egg");
         add("item.thaumaturge.cultist_knight_spawn_egg", "Crimson Knight Spawn Egg");
         add("item.thaumaturge.cultist_cleric_spawn_egg", "Crimson Cleric Spawn Egg");
+        add("item.thaumaturge.cultist_ranger_spawn_egg", "Crimson Ranger Spawn Egg");
+        add("item.thaumaturge.cultist_ranger_captain_spawn_egg", "Crimson Ranger Captain Spawn Egg");
         add("item.thaumaturge.cultist_portal_lesser_spawn_egg", "Lesser Crimson Portal Spawn Egg");
         add("item.thaumaturge.cultist_leader_spawn_egg", "Cultist Leader Spawn Egg");
         add("item.thaumaturge.cultist_portal_greater_spawn_egg", "Greater Crimson Portal Spawn Egg");
@@ -1673,6 +1713,12 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("item.thaumaturge.crimson_plate_helm", "Crimson Cult Helm");
         add("item.thaumaturge.crimson_plate_chest", "Crimson Cult Chestplate");
         add("item.thaumaturge.crimson_plate_legs", "Crimson Cult Greaves");
+        add("item.thaumaturge.crimson_ranger_helm", "Crimson Ranger Helm");
+        add("item.thaumaturge.crimson_ranger_chest", "Crimson Ranger Chestplate");
+        add("item.thaumaturge.crimson_ranger_legs", "Crimson Ranger Leggings");
+        add("item.thaumaturge.crimson_captain_helm", "Crimson Captain Helm");
+        add("item.thaumaturge.crimson_captain_chest", "Crimson Captain Chestplate");
+        add("filled_map.thaumaturge.cult", "Crimson Cult Map");
         add("tooltip.thaumaturge.crimson_blade.greater_sapping", "Greater Sapping");
         add("tooltip.thaumaturge.curio.read", "What knowledge does this hold?");
         add("message.thaumaturge.pech_wand.unfathomable", "You cannot fathom the workings of this yet.");
@@ -1700,6 +1746,15 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("mob_trait.thaumaturge.taint_blast", "Taint Blast");
         add("mob_trait.thaumaturge.taint_brood", "Taint Brood");
         add("mob_trait.thaumaturge.leaping", "Leaping");
+        add("mob_trait.thaumaturge.taint_shearing", "Taint Shearing");
+        add("mob_trait.thaumaturge.flux_milk", "Flux Milk");
+        add("mob_trait.thaumaturge.taint_laying", "Taint Laying");
+        add("mob_trait.thaumaturge.swarm_burst", "Swarm Burst");
+        add("mob_trait.thaumaturge.warping_strike", "Warping Strike");
+        add("mob_trait.thaumaturge.taint_arrows", "Taint Arrows");
+        add("mob_trait.thaumaturge.taint_brewing", "Taint Brewing");
+        add("mob_trait.thaumaturge.lifting_strike", "Lifting Strike");
+        add("mob_trait.thaumaturge.taintacle_lure", "Taintacle Lure");
         add("block.thaumaturge.loot_crate_common", "Common Crate");
         add("block.thaumaturge.loot_crate_uncommon", "Uncommon Crate");
         add("block.thaumaturge.loot_crate_rare", "Rare Crate");
@@ -1773,6 +1828,7 @@ public final class TTEnglishProvider extends LanguageProvider {
         addJadeMode("void_siphons", "Void Siphons");
         addJadeMode("deconstruction_tables", "Deconstruction Tables");
         addJadeMode("spas", "Arcane Spas");
+        addJadeMode("potion_sprayers", "Potion Sprayers");
         addJadeMode("everfull_urns", "Everfull Urns");
         addJadeMode("infernal_furnaces", "Infernal Furnaces");
         addJadeMode("focal_manipulators", "Focal Manipulators");
@@ -1812,6 +1868,9 @@ public final class TTEnglishProvider extends LanguageProvider {
         add("jade.thaumaturge.deconstruction.result", "Pending aspect: %s");
         add("jade.thaumaturge.spa.mix", "Mode: Mix bath salts");
         add("jade.thaumaturge.spa.water", "Mode: Dispense fluid");
+        add("jade.thaumaturge.spa.fluid", "Fluid: %s");
+        add("jade.thaumaturge.potion_sprayer.doses", "Stored doses: %s / %s");
+        add("jade.thaumaturge.potion_sprayer.potion", "Potion: %s");
         add("jade.thaumaturge.focal.vis", "Vis remaining: %s");
         add("jade.thaumaturge.focal.focus", "Focus: %s");
         add("jade.thaumaturge.focal.focus_inserted", "Focus inserted");

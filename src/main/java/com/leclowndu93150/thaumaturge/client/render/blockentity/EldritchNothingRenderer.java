@@ -4,6 +4,8 @@ import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEntityEldritch
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
@@ -29,40 +31,47 @@ public final class EldritchNothingRenderer implements BlockEntityRenderer<BlockE
         if (level == null) {
             return;
         }
-        VertexConsumer buffer = buffers.getBuffer(EldritchPortalSurface.surface());
-        PoseStack.Pose pose = poseStack.last();
+        List<Direction> faces = new ArrayList<>();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (Direction dir : Direction.values()) {
             cursor.setWithOffset(nothing.getBlockPos(), dir);
             BlockState neighbor = level.getBlockState(cursor);
             if (!neighbor.isSolidRender(level, cursor) && !neighbor.is(TTBlocks.ELDRITCH_NOTHING.get())) {
-                faceQuad(pose, buffer, nothing.getBlockPos(), dir);
+                faces.add(dir);
             }
         }
+        if (faces.isEmpty()) {
+            return;
+        }
+        EldritchPortalSurface.draw(poseStack, buffers, (pose, buffer) -> {
+            for (Direction dir : faces) {
+                faceQuad(pose, buffer, dir);
+            }
+        });
     }
 
-    private static void faceQuad(PoseStack.Pose pose, VertexConsumer buffer, BlockPos worldPos, Direction dir) {
+    private static void faceQuad(PoseStack.Pose pose, VertexConsumer buffer, Direction dir) {
         float near = INSET;
         float far = 1.0F - INSET;
         switch (dir) {
             case DOWN ->
                 EldritchPortalSurface.quad(
-                        pose, buffer, worldPos, 0.0F, near, 0.0F, 1.0F, near, 0.0F, 1.0F, near, 1.0F, 0.0F, near, 1.0F);
+                        pose, buffer, 0.0F, near, 0.0F, 1.0F, near, 0.0F, 1.0F, near, 1.0F, 0.0F, near, 1.0F);
             case UP ->
                 EldritchPortalSurface.quad(
-                        pose, buffer, worldPos, 0.0F, far, 0.0F, 1.0F, far, 0.0F, 1.0F, far, 1.0F, 0.0F, far, 1.0F);
+                        pose, buffer, 0.0F, far, 0.0F, 1.0F, far, 0.0F, 1.0F, far, 1.0F, 0.0F, far, 1.0F);
             case NORTH ->
                 EldritchPortalSurface.quad(
-                        pose, buffer, worldPos, 0.0F, 0.0F, near, 0.0F, 1.0F, near, 1.0F, 1.0F, near, 1.0F, 0.0F, near);
+                        pose, buffer, 0.0F, 0.0F, near, 0.0F, 1.0F, near, 1.0F, 1.0F, near, 1.0F, 0.0F, near);
             case SOUTH ->
                 EldritchPortalSurface.quad(
-                        pose, buffer, worldPos, 0.0F, 0.0F, far, 0.0F, 1.0F, far, 1.0F, 1.0F, far, 1.0F, 0.0F, far);
+                        pose, buffer, 0.0F, 0.0F, far, 0.0F, 1.0F, far, 1.0F, 1.0F, far, 1.0F, 0.0F, far);
             case WEST ->
                 EldritchPortalSurface.quad(
-                        pose, buffer, worldPos, near, 0.0F, 0.0F, near, 1.0F, 0.0F, near, 1.0F, 1.0F, near, 0.0F, 1.0F);
+                        pose, buffer, near, 0.0F, 0.0F, near, 1.0F, 0.0F, near, 1.0F, 1.0F, near, 0.0F, 1.0F);
             case EAST ->
                 EldritchPortalSurface.quad(
-                        pose, buffer, worldPos, far, 0.0F, 0.0F, far, 1.0F, 0.0F, far, 1.0F, 1.0F, far, 0.0F, 1.0F);
+                        pose, buffer, far, 0.0F, 0.0F, far, 1.0F, 0.0F, far, 1.0F, 1.0F, far, 0.0F, 1.0F);
         }
     }
 }

@@ -12,6 +12,7 @@ import com.leclowndu93150.thaumaturge.client.model.JarItemSpecialRenderer;
 import com.leclowndu93150.thaumaturge.client.model.JarNodeItemSpecialRenderer;
 import com.leclowndu93150.thaumaturge.client.model.NitorItemSpecialRenderer;
 import com.leclowndu93150.thaumaturge.client.model.NodeStabilizerItemSpecialRenderer;
+import com.leclowndu93150.thaumaturge.client.model.ResearchTableItemSpecialRenderer;
 import com.leclowndu93150.thaumaturge.client.model.WandItemSpecialRenderer;
 import com.leclowndu93150.thaumaturge.registry.TTItems;
 import java.util.function.Supplier;
@@ -31,13 +32,14 @@ public final class TTItemRenderExtensions {
 
     @SubscribeEvent
     public static void onRegisterClientExtensions(RegisterClientExtensionsEvent event) {
-        register(event, JarItemSpecialRenderer::new, TTItems.JAR_NORMAL, TTItems.JAR_VOID);
+        register(event, JarItemSpecialRenderer::new, TTItems.JAR_NORMAL, TTItems.JAR_VOID, TTItems.JAR_CREATIVE);
         register(event, JarBrainItemSpecialRenderer::new, TTItems.JAR_BRAIN);
         register(event, JarNodeItemSpecialRenderer::new, TTItems.JAR_NODE);
         register(event, AdvancedAlchemicalFurnaceItemSpecialRenderer::new, TTItems.ADVANCED_ALCHEMICAL_FURNACE);
         register(event, GolemBuilderItemSpecialRenderer::new, TTItems.GOLEM_BUILDER);
         register(event, GolemItemSpecialRenderer::new, TTItems.GOLEM_PLACER);
         register(event, DeconTableItemSpecialRenderer::new, TTItems.DECONSTRUCTION_TABLE);
+        register(event, ResearchTableItemSpecialRenderer::new, TTItems.RESEARCH_TABLE);
         register(event, WandItemSpecialRenderer::new, TTItems.WAND);
         register(event, () -> new NodeStabilizerItemSpecialRenderer(false), TTItems.NODE_STABILIZER);
         register(event, () -> new NodeStabilizerItemSpecialRenderer(true), TTItems.NODE_STABILIZER_ADVANCED);

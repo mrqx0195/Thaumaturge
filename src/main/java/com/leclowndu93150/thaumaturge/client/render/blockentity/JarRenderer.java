@@ -3,7 +3,7 @@ package com.leclowndu93150.thaumaturge.client.render.blockentity;
 import com.leclowndu93150.thaumaturge.api.aspect.IAspect;
 import com.leclowndu93150.thaumaturge.content.essentia.EssentiaTransportHelper;
 import com.leclowndu93150.thaumaturge.content.essentia.flow.EssentiaFlowHandler;
-import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJar;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.AbstractBlockEntityJar;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
@@ -23,7 +23,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
-public final class JarRenderer implements BlockEntityRenderer<BlockEntityJar> {
+public final class JarRenderer implements BlockEntityRenderer<AbstractBlockEntityJar> {
     private static final ResourceLocation BRINE_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("thaumaturge", "textures/entity/jarbrine.png");
     private static final ResourceLocation LABEL_TEXTURE =
@@ -33,10 +33,10 @@ public final class JarRenderer implements BlockEntityRenderer<BlockEntityJar> {
     public static final Material ANIMATED_GLOW_MATERIAL =
             new Material(TextureAtlas.LOCATION_BLOCKS, ANIMATED_GLOW_LOCATION);
 
-    public static final float FLUID_MIN = 4.5F / 16.0F;
-    public static final float FLUID_MAX = 11.5F / 16.0F;
+    public static final float FLUID_MIN = 4.0F / 16.0F;
+    public static final float FLUID_MAX = 12.0F / 16.0F;
     public static final float FLUID_BASE_Y = 1.0F / 16.0F;
-    public static final float FLUID_MAX_HEIGHT = 10.5F / 16.0F;
+    public static final float FLUID_MAX_HEIGHT = 10.0F / 16.0F;
 
     private static final float BRACE_MIN_XZ = 4.9F / 16.0F;
     private static final float BRACE_MAX_XZ = 11.1F / 16.0F;
@@ -53,7 +53,7 @@ public final class JarRenderer implements BlockEntityRenderer<BlockEntityJar> {
 
     @Override
     public void render(
-            BlockEntityJar jar,
+            AbstractBlockEntityJar jar,
             float partialTick,
             PoseStack poseStack,
             MultiBufferSource buffers,
@@ -322,15 +322,15 @@ public final class JarRenderer implements BlockEntityRenderer<BlockEntityJar> {
         if (facing.getAxis() == Direction.Axis.Z) poseStack.mulPose(Axis.YP.rotationDegrees(180));
         poseStack.mulPose(Axis.YP.rotationDegrees(facing.toYRot()));
         poseStack.translate(0.0, -0.1, -0.315 - 0.001);
-        float rot = (blockPos.getX() + facing.ordinal()) % 4 - 2;
+        float rot = Math.floorMod(blockPos.getX() + facing.ordinal(), 4) - 2;
         poseStack.mulPose(Axis.ZN.rotationDegrees(rot));
         poseStack.mulPose(Axis.YP.rotationDegrees(180));
-        labelQuad(buffers.getBuffer(RenderType.entityCutout(LABEL_TEXTURE)), poseStack.last(), light);
+        labelQuad(buffers.getBuffer(RenderType.entityCutoutNoCull(LABEL_TEXTURE)), poseStack.last(), light);
         if (filterTexture != null) {
             poseStack.pushPose();
             poseStack.translate(0.0, 0.0, 0.001);
             aspectIconQuad(
-                    buffers.getBuffer(RenderType.entityTranslucent(filterTexture)),
+                    buffers.getBuffer(RenderType.entityTranslucentCull(filterTexture)),
                     poseStack.last(),
                     filterColor,
                     light);

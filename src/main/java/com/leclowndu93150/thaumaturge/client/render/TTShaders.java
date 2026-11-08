@@ -14,6 +14,7 @@ import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 @EventBusSubscriber(modid = TTIds.MODID, value = Dist.CLIENT)
 public final class TTShaders {
     private static ShaderInstance ender;
+    private static ShaderInstance entityFlat;
     private static ShaderInstance occludingEffect;
     private static ShaderInstance fx;
     private static ShaderInstance fxAlphaTest;
@@ -31,32 +32,36 @@ public final class TTShaders {
         return occludingEffect;
     }
 
+    public static ShaderInstance entityFlat() {
+        return IrisCompat.overridesShaders() ? GameRenderer.getRendertypeEntityTranslucentEmissiveShader() : entityFlat;
+    }
+
     /**
      * Core effect shaders that must keep their Thaumaturge fragment program under Iris. Iris normally blocks unknown
-     * core shaders while a shader pack is active; the Iris compatibility mixin selectively opts these two back in.
+     * core shaders while a shader pack is active; the Iris compatibility mixin selectively opts these back in.
      */
     public static boolean isIrisAllowedCustomEffectShader(ShaderInstance shader) {
-        return shader != null && (shader == ender || shader == occludingEffect);
+        return shader != null && (shader == ender || shader == occludingEffect || shader == portal);
     }
 
     public static ShaderInstance fx() {
-        return IrisCompat.shadersActive() ? IrisCompat.particleTranslucentShader() : fx;
+        return IrisCompat.overridesShaders() ? IrisCompat.particleTranslucentShader() : fx;
     }
 
     public static ShaderInstance fxAlphaTest() {
-        return IrisCompat.shadersActive() ? IrisCompat.particleTranslucentShader() : fxAlphaTest;
+        return IrisCompat.overridesShaders() ? IrisCompat.particleTranslucentShader() : fxAlphaTest;
     }
 
     public static ShaderInstance portal() {
-        return IrisCompat.shadersActive() ? GameRenderer.getPositionTexShader() : portal;
+        return portal;
     }
 
     public static ShaderInstance voidStream() {
-        return IrisCompat.shadersActive() ? GameRenderer.getPositionTexColorShader() : voidStream;
+        return IrisCompat.overridesShaders() ? GameRenderer.getPositionTexColorShader() : voidStream;
     }
 
     public static ShaderInstance wardAdd() {
-        return IrisCompat.shadersActive() ? GameRenderer.getPositionTexColorShader() : wardAdd;
+        return IrisCompat.overridesShaders() ? GameRenderer.getPositionTexColorShader() : wardAdd;
     }
 
     @SubscribeEvent
@@ -64,6 +69,10 @@ public final class TTShaders {
         event.registerShader(
                 new ShaderInstance(event.getResourceProvider(), TTIds.rl("tt_ender"), DefaultVertexFormat.POSITION),
                 shader -> ender = shader);
+        event.registerShader(
+                new ShaderInstance(
+                        event.getResourceProvider(), TTIds.rl("tt_entity_flat"), DefaultVertexFormat.NEW_ENTITY),
+                shader -> entityFlat = shader);
         event.registerShader(
                 new ShaderInstance(event.getResourceProvider(), TTIds.rl("tt_fx"), DefaultVertexFormat.PARTICLE),
                 shader -> fx = shader);
@@ -76,8 +85,7 @@ public final class TTShaders {
                         event.getResourceProvider(), TTIds.rl("tt_occluding_effect"), DefaultVertexFormat.NEW_ENTITY),
                 shader -> occludingEffect = shader);
         event.registerShader(
-                new ShaderInstance(
-                        event.getResourceProvider(), TTIds.rl("tt_portal"), DefaultVertexFormat.POSITION_TEX),
+                new ShaderInstance(event.getResourceProvider(), TTIds.rl("tt_portal"), DefaultVertexFormat.POSITION),
                 shader -> portal = shader);
         event.registerShader(
                 new ShaderInstance(

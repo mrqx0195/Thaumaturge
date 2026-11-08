@@ -60,7 +60,7 @@ class BlockFluxGasSpreadTest {
     }
 
     @Test
-    void sidewaysSpreadLeavesOrdinaryLiquidNeighborsUntouched() throws Exception {
+    void sidewaysSpreadDisplacesOrdinaryLiquidNeighbors() throws Exception {
         BlockFluxGas gas = (BlockFluxGas) BlockFluxGas.gasBlockState(1).getBlock();
         ServerLevel level = mock(ServerLevel.class);
         RandomSource random = mock(RandomSource.class);
@@ -71,9 +71,10 @@ class BlockFluxGasSpreadTest {
 
         invokeSpread(gas, level, BlockPos.ZERO, 8, random);
 
-        verify(level).getBlockState(target);
-        verify(level, never()).setBlock(any(BlockPos.class), any(), anyInt());
+        verify(level, times(2)).getBlockState(target);
+        verify(level).setBlock(BlockPos.ZERO, BlockFluxGas.gasBlockState(4), Block.UPDATE_ALL);
         verify(level, never()).destroyBlock(any(BlockPos.class), anyBoolean());
+        verify(level).setBlock(target, BlockFluxGas.gasBlockState(4), Block.UPDATE_ALL);
         verify(random, never()).nextInt(anyInt());
     }
 

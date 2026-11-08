@@ -82,7 +82,7 @@ public final class HarvestBehavior implements ISealBehavior {
         int now = clock.advance();
         if (now % TIDY_PERIOD == 0) {
             harvests.dropFinished(level);
-            forgetSitesOutside(level, SealArea.bounds(seal));
+            forgetSitesOutside(level, seal, SealArea.bounds(seal));
         }
         if (now % SCAN_PERIOD != 0) {
             return;
@@ -103,8 +103,8 @@ public final class HarvestBehavior implements ISealBehavior {
         }
     }
 
-    private void forgetSitesOutside(ServerLevel level, AABB bounds) {
-        sites.values().removeIf(site -> {
+    private void forgetSitesOutside(ServerLevel level, ISealEntity seal, AABB bounds) {
+        boolean forgot = sites.values().removeIf(site -> {
             if (bounds.contains(Vec3.atCenterOf(site.pos()))) {
                 return false;
             }
@@ -114,6 +114,9 @@ public final class HarvestBehavior implements ISealBehavior {
             }
             return true;
         });
+        if (forgot) {
+            seal.markChanged(level);
+        }
     }
 
     private Task post(ServerLevel level, ISealEntity seal, BlockPos pos, int job) {
@@ -162,14 +165,14 @@ public final class HarvestBehavior implements ISealBehavior {
         BlockPos pos = task.pos();
         BlockState crop = level.getBlockState(pos);
         if (CropUtils.isClickableCrop(crop)) {
-            GolemInteractionHelper.golemClick(level, golem, pos, Direction.UP, ItemStack.EMPTY, false, false);
+            GolemInteractionHelper.golemClick(level, golem, pos, Direction.UP, ItemStack.EMPTY, false, true);
             return;
         }
         FakePlayer hand = TTFakePlayer.GOLEM.at(level, golem.asEntity());
         ItemStack seed = CropUtils.getSeed(level, pos, crop);
         Direction support = CropUtils.plantingSupport(crop).orElse(null);
         boolean tilled = level.getBlockState(pos.below()).getBlock() instanceof FarmBlock;
-        GolemInteractionHelper.golemClick(level, golem, pos, Direction.UP, ItemStack.EMPTY, false, false);
+        GolemInteractionHelper.golemClick(level, golem, pos, Direction.UP, ItemStack.EMPTY, false, true);
         if (!CropUtils.isGrownCrop(level, pos)) {
             return;
         }
@@ -190,6 +193,7 @@ public final class HarvestBehavior implements ISealBehavior {
         ReplantSite site = new ReplantSite(pos, support, seed.copyWithCount(1), support == Direction.DOWN && tilled);
         site.assign(replant.id());
         sites.put(pos.asLong(), site);
+        seal.markChanged(level);
     }
 
     private void replant(ServerLevel level, IGolemAPI golem, Task task) {

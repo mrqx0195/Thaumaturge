@@ -1,6 +1,7 @@
 package com.leclowndu93150.thaumaturge.registry;
 
 import com.leclowndu93150.thaumaturge.TTIds;
+import com.leclowndu93150.thaumaturge.api.items.trim.TTTrimPatterns;
 import com.leclowndu93150.thaumaturge.content.aura.node.CreativeNodePlacerItem;
 import com.leclowndu93150.thaumaturge.content.aura.node.JarNodeItem;
 import com.leclowndu93150.thaumaturge.content.casters.FocusPouchItem;
@@ -32,6 +33,7 @@ import com.leclowndu93150.thaumaturge.content.equipment.VoidGearItem;
 import com.leclowndu93150.thaumaturge.content.equipment.VoidHoeItem;
 import com.leclowndu93150.thaumaturge.content.equipment.VoidPickaxeItem;
 import com.leclowndu93150.thaumaturge.content.equipment.VoidRobeArmorItem;
+import com.leclowndu93150.thaumaturge.content.equipment.VoidShieldItem;
 import com.leclowndu93150.thaumaturge.content.equipment.VoidShovelItem;
 import com.leclowndu93150.thaumaturge.content.equipment.VoidSwordItem;
 import com.leclowndu93150.thaumaturge.content.equipment.bauble.AmuletVisItem;
@@ -39,6 +41,7 @@ import com.leclowndu93150.thaumaturge.content.equipment.bauble.TrinketItem;
 import com.leclowndu93150.thaumaturge.content.equipment.bauble.VerdantCharmItem;
 import com.leclowndu93150.thaumaturge.content.equipment.bauble.VoidseerCharmItem;
 import com.leclowndu93150.thaumaturge.content.equipment.hover.ThaumostaticHarnessItem;
+import com.leclowndu93150.thaumaturge.content.equipment.shield.ThaumicShieldItem;
 import com.leclowndu93150.thaumaturge.content.essentia.ItemResonator;
 import com.leclowndu93150.thaumaturge.content.essentia.advancedfurnace.ItemAdvancedAlchemicalFurnace;
 import com.leclowndu93150.thaumaturge.content.essentia.jar.JarBraceItem;
@@ -69,6 +72,7 @@ import com.leclowndu93150.thaumaturge.content.research.book.SharingThaumonomicon
 import com.leclowndu93150.thaumaturge.content.research.book.ThaumonomiconItem;
 import com.leclowndu93150.thaumaturge.content.research.note.ItemResearchNote;
 import com.leclowndu93150.thaumaturge.content.spell.item.FocusItem;
+import com.leclowndu93150.thaumaturge.content.taint.entity.ability.ThrownTaintedEgg;
 import com.leclowndu93150.thaumaturge.content.taint.item.ItemEssentiaCrystal;
 import com.leclowndu93150.thaumaturge.content.wands.ItemPrimalCharm;
 import com.leclowndu93150.thaumaturge.content.wands.ItemWand;
@@ -83,6 +87,7 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Unit;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -99,6 +104,7 @@ import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
+import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -143,6 +149,11 @@ public final class TTItems {
 
     public static final DeferredItem<BlockItem> JAR_VOID = registerSimpleBlockItem(TTBlocks.JAR_VOID, JarItem::new);
 
+    public static final DeferredItem<BlockItem> JAR_CREATIVE = ITEMS.registerItem(
+            "jar_creative",
+            props -> new JarItem(TTBlocks.JAR_CREATIVE.get(), props),
+            new Item.Properties().component(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true));
+
     public static final DeferredItem<BlockItem> TUBE = ITEMS.registerSimpleBlockItem(TTBlocks.TUBE);
 
     public static final DeferredItem<BlockItem> TUBE_VALVE = ITEMS.registerSimpleBlockItem(TTBlocks.TUBE_VALVE);
@@ -176,6 +187,11 @@ public final class TTItems {
             "liquid_death_bucket",
             props -> new BucketItem(TTFluids.LIQUID_DEATH_SOURCE.get(), props),
             new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1).rarity(Rarity.RARE));
+
+    public static final DeferredItem<BucketItem> BUCKET_FLUX_GOO = ITEMS.registerItem(
+            "flux_goo_bucket",
+            props -> new BucketItem(TTFluids.FLUX_GOO_SOURCE.get(), props),
+            new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1));
 
     public static final DeferredItem<BucketItem> BUCKET_PURIFYING = ITEMS.registerItem(
             "purifying_bucket",
@@ -223,6 +239,11 @@ public final class TTItems {
             "bottle_taint",
             props -> new ThrowableItem(props, EntityBottleTaint::new, EntityBottleTaint.THROW),
             new Item.Properties().stacksTo(8).rarity(Rarity.UNCOMMON));
+
+    public static final DeferredItem<ThrowableItem> TAINTED_EGG = ITEMS.registerItem(
+            "tainted_egg",
+            props -> new ThrowableItem(props, ThrownTaintedEgg::new, ThrownTaintedEgg.THROW),
+            new Item.Properties().stacksTo(16));
 
     public static final DeferredItem<BlockItem> THAUMATORIUM = ITEMS.registerSimpleBlockItem(TTBlocks.THAUMATORIUM);
     public static final DeferredItem<BlockItem> BRAIN_BOX = ITEMS.registerSimpleBlockItem(TTBlocks.BRAIN_BOX);
@@ -306,6 +327,15 @@ public final class TTItems {
                     TTMaterials.ARMOR_THAUMIUM,
                     ArmorItem.Type.BOOTS,
                     props.durability(ArmorItem.Type.BOOTS.getDurability(TTMaterials.DURABILITY_THAUMIUM))));
+    public static final DeferredItem<ThaumicShieldItem> THAUMIUM_SHIELD = ITEMS.registerItem(
+            "thaumium_shield",
+            props -> new ThaumicShieldItem(
+                    props, TTItemTags.INGOTS_THAUMIUM, TTMaterials.TOOL_THAUMIUM.getEnchantmentValue()),
+            new Item.Properties().durability(512));
+    public static final DeferredItem<ThaumicShieldItem> MIRROR_SHIELD = ITEMS.registerItem(
+            "mirror_shield",
+            props -> new ThaumicShieldItem(props, Tags.Items.INGOTS_GOLD, 0),
+            new Item.Properties().durability(336).rarity(Rarity.UNCOMMON));
 
     public static final DeferredItem<VoidSwordItem> VOID_SWORD = ITEMS.registerItem(
             "void_sword",
@@ -350,6 +380,8 @@ public final class TTItems {
                     TTMaterials.ARMOR_VOID,
                     ArmorItem.Type.BOOTS,
                     props.durability(ArmorItem.Type.BOOTS.getDurability(TTMaterials.DURABILITY_VOID))));
+    public static final DeferredItem<VoidShieldItem> VOID_SHIELD =
+            ITEMS.registerItem("void_shield", VoidShieldItem::new, new Item.Properties().durability(512));
 
     public static final DeferredItem<ElementalSwordItem> ELEMENTAL_SWORD = ITEMS.registerItem(
             "elemental_sword",
@@ -408,6 +440,41 @@ public final class TTItems {
                     ArmorItem.Type.LEGGINGS,
                     props.durability(ArmorItem.Type.LEGGINGS.getDurability(TTMaterials.DURABILITY_CULTIST_PLATE))
                             .rarity(Rarity.UNCOMMON)));
+    public static final DeferredItem<ArmorItem> CRIMSON_RANGER_HELM = ITEMS.registerItem(
+            "crimson_ranger_helm",
+            props -> new ArmorItem(
+                    TTMaterials.ARMOR_CULTIST_RANGER,
+                    ArmorItem.Type.HELMET,
+                    props.durability(ArmorItem.Type.HELMET.getDurability(TTMaterials.DURABILITY_CULTIST_RANGER))
+                            .rarity(Rarity.UNCOMMON)));
+    public static final DeferredItem<ArmorItem> CRIMSON_RANGER_CHEST = ITEMS.registerItem(
+            "crimson_ranger_chest",
+            props -> new ArmorItem(
+                    TTMaterials.ARMOR_CULTIST_RANGER,
+                    ArmorItem.Type.CHESTPLATE,
+                    props.durability(ArmorItem.Type.CHESTPLATE.getDurability(TTMaterials.DURABILITY_CULTIST_RANGER))
+                            .rarity(Rarity.UNCOMMON)));
+    public static final DeferredItem<ArmorItem> CRIMSON_RANGER_LEGS = ITEMS.registerItem(
+            "crimson_ranger_legs",
+            props -> new ArmorItem(
+                    TTMaterials.ARMOR_CULTIST_RANGER,
+                    ArmorItem.Type.LEGGINGS,
+                    props.durability(ArmorItem.Type.LEGGINGS.getDurability(TTMaterials.DURABILITY_CULTIST_RANGER))
+                            .rarity(Rarity.UNCOMMON)));
+    public static final DeferredItem<ArmorItem> CRIMSON_CAPTAIN_HELM = ITEMS.registerItem(
+            "crimson_captain_helm",
+            props -> new ArmorItem(
+                    TTMaterials.ARMOR_CULTIST_CAPTAIN,
+                    ArmorItem.Type.HELMET,
+                    props.durability(ArmorItem.Type.HELMET.getDurability(TTMaterials.DURABILITY_CULTIST_CAPTAIN))
+                            .rarity(Rarity.RARE)));
+    public static final DeferredItem<ArmorItem> CRIMSON_CAPTAIN_CHEST = ITEMS.registerItem(
+            "crimson_captain_chest",
+            props -> new ArmorItem(
+                    TTMaterials.ARMOR_CULTIST_CAPTAIN,
+                    ArmorItem.Type.CHESTPLATE,
+                    props.durability(ArmorItem.Type.CHESTPLATE.getDurability(TTMaterials.DURABILITY_CULTIST_CAPTAIN))
+                            .rarity(Rarity.RARE)));
     public static final DeferredItem<CultistRobeItem> CRIMSON_BOOTS = ITEMS.registerItem(
             "crimson_boots",
             props -> new CultistRobeItem(
@@ -581,6 +648,10 @@ public final class TTItems {
             registerSpawnEgg("cultist_knight_spawn_egg", TTEntities.CULTIST_KNIGHT);
     public static final DeferredItem<SpawnEggItem> CULTIST_CLERIC_SPAWN_EGG =
             registerSpawnEgg("cultist_cleric_spawn_egg", TTEntities.CULTIST_CLERIC);
+    public static final DeferredItem<SpawnEggItem> CULTIST_RANGER_SPAWN_EGG =
+            registerSpawnEgg("cultist_ranger_spawn_egg", TTEntities.CULTIST_RANGER);
+    public static final DeferredItem<SpawnEggItem> CULTIST_RANGER_CAPTAIN_SPAWN_EGG =
+            registerSpawnEgg("cultist_ranger_captain_spawn_egg", TTEntities.CULTIST_RANGER_CAPTAIN);
     public static final DeferredItem<SpawnEggItem> CULTIST_PORTAL_LESSER_SPAWN_EGG =
             registerSpawnEgg("cultist_portal_lesser_spawn_egg", TTEntities.CULTIST_PORTAL_LESSER);
 
@@ -597,6 +668,13 @@ public final class TTItems {
             "loot_bag_rare",
             props -> new LootBagItem(
                     TTLootTables.LOOT_BAG_RARE, props.stacksTo(16).rarity(Rarity.RARE)));
+
+    public static final DeferredItem<SmithingTemplateItem> ARCANE_ARMOR_TRIM_SMITHING_TEMPLATE = ITEMS.register(
+            "arcane_armor_trim_smithing_template",
+            () -> SmithingTemplateItem.createArmorTrimTemplate(TTTrimPatterns.ARCANE));
+    public static final DeferredItem<SmithingTemplateItem> OCCULT_ARMOR_TRIM_SMITHING_TEMPLATE = ITEMS.register(
+            "occult_armor_trim_smithing_template",
+            () -> SmithingTemplateItem.createArmorTrimTemplate(TTTrimPatterns.OCCULT));
 
     public static final DeferredItem<BlockItem> LOOT_URN_COMMON =
             ITEMS.registerSimpleBlockItem(TTBlocks.LOOT_URN_COMMON);

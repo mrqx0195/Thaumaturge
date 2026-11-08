@@ -1,7 +1,7 @@
 package com.leclowndu93150.thaumaturge.content.aura.node;
 
 import com.leclowndu93150.thaumaturge.api.casters.FocusCaster;
-import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockJar;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.AbstractBlockJar;
 import com.leclowndu93150.thaumaturge.registry.TTBlockEntities;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.mojang.serialization.MapCodec;
@@ -40,7 +40,7 @@ public final class BlockJarNode extends Block implements EntityBlock {
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return BlockJar.SHAPE;
+        return AbstractBlockJar.SHAPE;
     }
 
     @Override
@@ -74,6 +74,12 @@ public final class BlockJarNode extends Block implements EntityBlock {
             return ItemInteractionResult.SUCCESS;
         }
         return super.useItemOn(stack, state, level, pos, player, hand, hit);
+    }
+
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
+        BlockNode.unindexNode(state, level, pos, newState);
+        super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
     @Override

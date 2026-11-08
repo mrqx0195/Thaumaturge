@@ -2,6 +2,7 @@ package com.leclowndu93150.thaumaturge.content.entity;
 
 import com.leclowndu93150.thaumaturge.content.particle.TaintSwarmParticleOptions;
 import com.leclowndu93150.thaumaturge.content.taint.ecology.TaintBiomeManager;
+import com.leclowndu93150.thaumaturge.registry.TTEntities;
 import com.leclowndu93150.thaumaturge.registry.TTSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -36,10 +37,12 @@ public final class EntityTaintSwarm extends Monster {
 
     private static final int ATTACK_RANGE = 3;
     private static final int ATTACK_COOLDOWN = 15;
+    private static final float FULL_TURN_DEGREES = 360.0F;
     private static final int WEAKNESS_DURATION = 100;
     private static final float SELF_DAMAGE_SUMMONED = 5.0F;
-    // No swarm model: its body is a cloud of roughly thirty attached particles.
     private static final int SWARM_PARTICLES_PER_TICK = 1;
+    private static final double FOLLOW_RANGE = 8.0;
+    private static final int FLIGHT_TARGET_ATTEMPTS = 8;
 
     private int damBonus;
     private int attackTicks;
@@ -51,15 +54,22 @@ public final class EntityTaintSwarm extends Monster {
         this.xpReward = 4;
     }
 
+    public static void release(ServerLevel level, double x, double y, double z) {
+        EntityTaintSwarm swarm = TTEntities.TAINT_SWARM.get().create(level);
+        if (swarm == null) {
+            return;
+        }
+        swarm.moveTo(x, y, z, level.getRandom().nextFloat() * FULL_TURN_DEGREES, 0.0F);
+        level.addFreshEntity(swarm);
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 30.0)
                 .add(Attributes.ATTACK_DAMAGE, 2.0)
                 .add(Attributes.FLYING_SPEED, 0.6)
                 .add(Attributes.MOVEMENT_SPEED, 0.3)
-                // Swarms only acquire a nearby victim (12 blocks), rather than hunting
-                // across the whole geyser activation radius.
-                .add(Attributes.FOLLOW_RANGE, 12.0);
+                .add(Attributes.FOLLOW_RANGE, FOLLOW_RANGE);
     }
 
     @Override
@@ -124,8 +134,6 @@ public final class EntityTaintSwarm extends Monster {
             return;
         }
 
-        // Swarms actively fly toward their victim; merely assigning a target is insufficient
-        // with a FlyingMoveControl and no pathing attack goal.
         this.moveControl.setWantedPosition(target.getX(), target.getEyeY(), target.getZ(), 1.0);
         if (attackTicks > 0) {
             return;
@@ -150,7 +158,7 @@ public final class EntityTaintSwarm extends Monster {
                 || random.nextInt(30) == 0
                 || flightTarget.distSqr(blockPosition()) < 4.0) {
             flightTarget = null;
-            for (int attempt = 0; attempt < 12; attempt++) {
+            for (int attempt = 0; attempt < FLIGHT_TARGET_ATTEMPTS; attempt++) {
                 BlockPos candidate = blockPosition()
                         .offset(
                                 random.nextInt(7) - random.nextInt(7),
@@ -178,10 +186,6 @@ public final class EntityTaintSwarm extends Monster {
             return false;
         }
         return TaintBiomeManager.isTainted(level, pos);
-    }
-
-    public float effectiveAttackDamage() {
-        return (float) this.getAttributeValue(Attributes.ATTACK_DAMAGE) + damBonus;
     }
 
     @Override

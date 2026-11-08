@@ -17,6 +17,7 @@ import com.leclowndu93150.thaumaturge.client.render.research.ConnectorRenderer;
 import com.leclowndu93150.thaumaturge.client.render.research.EntryIconRenderer;
 import com.leclowndu93150.thaumaturge.client.screen.AbstractTTScreen;
 import com.leclowndu93150.thaumaturge.client.screen.TTScreenTextures;
+import com.leclowndu93150.thaumaturge.client.screen.TTTooltips;
 import com.leclowndu93150.thaumaturge.client.screen.tooltip.TTTooltipRenderer;
 import com.leclowndu93150.thaumaturge.network.ServerboundClearResearchFlagsPayload;
 import com.leclowndu93150.thaumaturge.network.ServerboundUnlockResearchPayload;
@@ -497,6 +498,10 @@ public final class ThaumonomiconBrowserScreen extends AbstractTTScreen {
     @Override
     public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
         if (!searching) {
+            if (scrollY != 0.0 && categoryScrollVisible() && x >= width - CATEGORY_BUTTON_X_RIGHT_MARGIN) {
+                shiftCategoryScroll(scrollY < 0.0 ? 1 : -1);
+                return true;
+            }
             if (scrollY < 0.0) {
                 screenZoom += ZOOM_STEP;
             } else if (scrollY > 0.0) {
@@ -1056,17 +1061,19 @@ public final class ThaumonomiconBrowserScreen extends AbstractTTScreen {
             graphics.drawString(font, full, labelX, labelY, HOVER_LABEL_COLOR, false);
             int t = CATEGORY_LABEL_LINE_HEIGHT;
             if (hasNewResearch) {
-                String s = Component.translatable("tooltip.thaumaturge.research.new_research")
-                        .getString();
-                int sx = !flip ? x + CATEGORY_LABEL_GAP_X : screenX + CATEGORY_LABEL_FROM_RIGHT_OFFSET - font.width(s);
-                graphics.drawString(font, s, sx, labelY + t, HOVER_LABEL_COLOR, false);
+                Component text = TTTooltips.researchNew();
+                int sx = !flip
+                        ? x + CATEGORY_LABEL_GAP_X
+                        : screenX + CATEGORY_LABEL_FROM_RIGHT_OFFSET - font.width(text);
+                graphics.drawString(font, text, sx, labelY + t, HOVER_LABEL_COLOR, false);
                 t += CATEGORY_LABEL_LINE_HEIGHT;
             }
             if (hasNewPage) {
-                String s = Component.translatable("tooltip.thaumaturge.research.new_page")
-                        .getString();
-                int sx = !flip ? x + CATEGORY_LABEL_GAP_X : screenX + CATEGORY_LABEL_FROM_RIGHT_OFFSET - font.width(s);
-                graphics.drawString(font, s, sx, labelY + t, HOVER_LABEL_COLOR, false);
+                Component text = TTTooltips.pageNew();
+                int sx = !flip
+                        ? x + CATEGORY_LABEL_GAP_X
+                        : screenX + CATEGORY_LABEL_FROM_RIGHT_OFFSET - font.width(text);
+                graphics.drawString(font, text, sx, labelY + t, HOVER_LABEL_COLOR, false);
             }
         }
     }
@@ -1184,24 +1191,22 @@ public final class ThaumonomiconBrowserScreen extends AbstractTTScreen {
                 int stage = knowledge.stageOf(node.id);
                 if (stage >= 0) {
                     MutableComponent stageLine = Component.literal("@@")
-                            .append(Component.literal(ChatFormatting.AQUA
-                                    + Component.translatable("tooltip.thaumaturge.research.stage")
-                                            .getString() + " " + (stage + 1) + "/"
-                                    + node.entry.stages().size() + ChatFormatting.RESET));
+                            .append(Component.translatable("tooltip.thaumaturge.research.stage")
+                                    .append(Component.literal(" " + (stage + 1) + "/"
+                                            + node.entry.stages().size()))
+                                    .withStyle(ChatFormatting.AQUA));
                     lines.add(stageLine);
                 } else {
                     MutableComponent begin = Component.literal("@@")
-                            .append(Component.literal(ChatFormatting.GREEN
-                                    + Component.translatable("tooltip.thaumaturge.research.not_begun")
-                                            .getString()
-                                    + ChatFormatting.RESET));
+                            .append(Component.translatable("tooltip.thaumaturge.research.not_begun")
+                                    .withStyle(ChatFormatting.GREEN));
                     lines.add(begin);
                 }
             }
         } else {
-            lines.add(Component.literal("@@" + ChatFormatting.RED
-                    + Component.translatable("tooltip.thaumaturge.research.missing")
-                            .getString()));
+            lines.add(Component.literal("@@")
+                    .append(Component.translatable("tooltip.thaumaturge.research.missing")
+                            .withStyle(ChatFormatting.RED)));
             for (ResearchParent parent : node.entry.parents()) {
                 if (parent.isSatisfiedBy(knowledge)) continue;
                 String s = "?";
@@ -1209,19 +1214,19 @@ public final class ThaumonomiconBrowserScreen extends AbstractTTScreen {
                 if (parentNode != null) {
                     s = Component.translatable(parentNode.entry.nameKey()).getString();
                 }
-                lines.add(Component.literal("@@" + ChatFormatting.YELLOW + " - " + s));
+                lines.add(Component.literal("@@ - " + s).withStyle(ChatFormatting.YELLOW));
             }
             for (Component message : ResearchUnlockConditions.lockedMessages(minecraft.player, knowledge, node.id)) {
-                lines.add(
-                        Component.literal("@@" + ChatFormatting.YELLOW + " - ").append(message));
+                lines.add(Component.literal("@@ - ")
+                        .withStyle(ChatFormatting.YELLOW)
+                        .append(message));
             }
         }
         if (knowledge.hasFlag(node.id, ResearchFlag.RESEARCH)) {
-            lines.add(Component.literal("@@")
-                    .append(Component.translatable("tooltip.thaumaturge.research.new_research")));
+            lines.add(Component.literal("@@").append(TTTooltips.researchNew()));
         }
         if (knowledge.hasFlag(node.id, ResearchFlag.PAGE)) {
-            lines.add(Component.literal("@@").append(Component.translatable("tooltip.thaumaturge.research.new_page")));
+            lines.add(Component.literal("@@").append(TTTooltips.pageNew()));
         }
         if (minecraft.options.advancedItemTooltips) {
             lines.add(Component.literal(node.id.toString()).withStyle(ChatFormatting.DARK_GRAY));
@@ -1238,6 +1243,20 @@ public final class ThaumonomiconBrowserScreen extends AbstractTTScreen {
 
     private static final float BUTTON_CLACK_VOLUME = 0.4F;
     private static final float PAGE_OPEN_VOLUME = 0.66F;
+
+    private boolean categoryScrollVisible() {
+        return catScrollMax > 0 || catScrollPos != 0;
+    }
+
+    private void shiftCategoryScroll(int delta) {
+        int target = catScrollPos + delta;
+        if (target < 0 || target > catScrollMax) {
+            return;
+        }
+        playButtonClack();
+        catScrollPos = target;
+        updateResearch();
+    }
 
     private void playButtonClack() {
         if (minecraft != null && minecraft.player != null) {
@@ -1266,19 +1285,11 @@ public final class ThaumonomiconBrowserScreen extends AbstractTTScreen {
             return true;
         }
         if (hitScrollUp(mx, my)) {
-            if (catScrollPos > 0) {
-                playButtonClack();
-                catScrollPos--;
-                updateResearch();
-            }
+            shiftCategoryScroll(-1);
             return true;
         }
         if (hitScrollDown(mx, my)) {
-            if (catScrollPos < catScrollMax) {
-                playButtonClack();
-                catScrollPos++;
-                updateResearch();
-            }
+            shiftCategoryScroll(1);
             return true;
         }
         Holder.Reference<IResearchCategory> tabHit = hitCategoryButton(mx, my);

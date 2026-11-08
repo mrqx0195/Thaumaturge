@@ -6,6 +6,7 @@ import com.leclowndu93150.thaumaturge.api.aspect.AspectList;
 import com.leclowndu93150.thaumaturge.api.aspect.IAspect;
 import com.leclowndu93150.thaumaturge.api.aspect.TTAspects;
 import com.leclowndu93150.thaumaturge.api.items.InfusionEnchantment;
+import com.leclowndu93150.thaumaturge.api.items.trim.TTTrimPatterns;
 import com.leclowndu93150.thaumaturge.api.recipe.ResearchGate;
 import com.leclowndu93150.thaumaturge.api.wands.WandCap;
 import com.leclowndu93150.thaumaturge.api.wands.WandRod;
@@ -20,6 +21,7 @@ import com.leclowndu93150.thaumaturge.content.recipe.dust.DustTriggerMultiblockR
 import com.leclowndu93150.thaumaturge.content.recipe.dust.DustTriggerSimpleRecipe;
 import com.leclowndu93150.thaumaturge.content.recipe.dust.DustTriggerTagRecipe;
 import com.leclowndu93150.thaumaturge.content.recipe.label.LabelFilterRecipe;
+import com.leclowndu93150.thaumaturge.content.recipe.pearl.PrimordialPearlRepairRecipe;
 import com.leclowndu93150.thaumaturge.content.wands.WandParts;
 import com.leclowndu93150.thaumaturge.data.recipe.builders.CrucibleRecipeBuilder;
 import com.leclowndu93150.thaumaturge.data.recipe.builders.InfusionEnchantmentRecipeBuilder;
@@ -53,6 +55,7 @@ import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.data.recipes.ShapelessRecipeBuilder;
 import net.minecraft.data.recipes.SimpleCookingRecipeBuilder;
 import net.minecraft.data.recipes.SingleItemRecipeBuilder;
+import net.minecraft.data.recipes.SmithingTrimRecipeBuilder;
 import net.minecraft.data.recipes.SpecialRecipeBuilder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -68,6 +71,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.item.armortrim.TrimPattern;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
@@ -112,6 +116,8 @@ public final class TTRecipeProvider extends RecipeProvider {
         this.registries = provider;
         this.items = provider.lookupOrThrow(Registries.ITEM);
         buildDustTriggerRecipes();
+        SpecialRecipeBuilder.special(category -> PrimordialPearlRepairRecipe.INSTANCE)
+                .save(recipeOutput, "thaumaturge:primordial_pearl_repair");
         buildSalisMundusRecipe();
         buildArcaneWorkbenchRecipes();
         buildBannerRecipes();
@@ -122,6 +128,7 @@ public final class TTRecipeProvider extends RecipeProvider {
         buildRunicAugmentRecipe();
         buildElementalToolRecipes();
         buildTravellerBootsRecipe();
+        buildArmorTrimRecipes();
         buildRechargePedestalRecipe();
         buildFocalManipulatorRecipe();
         buildCrucibleRecipes();
@@ -1040,6 +1047,24 @@ public final class TTRecipeProvider extends RecipeProvider {
                 .gate(gate("recharge_pedestal"))
                 .unlockedBy("has", has(TTItems.VIS_RESONATOR))
                 .save(output);
+    }
+
+    private void buildArmorTrimRecipes() {
+        armorTrim(
+                TTItems.ARCANE_ARMOR_TRIM_SMITHING_TEMPLATE.get(), TTTrimPatterns.ARCANE, TTBlocks.STONE_ARCANE.get());
+        armorTrim(
+                TTItems.OCCULT_ARMOR_TRIM_SMITHING_TEMPLATE.get(), TTTrimPatterns.OCCULT, TTBlocks.STONE_ANCIENT.get());
+    }
+
+    private void armorTrim(Item template, ResourceKey<TrimPattern> pattern, ItemLike duplicationBase) {
+        SmithingTrimRecipeBuilder.smithingTrim(
+                        Ingredient.of(template),
+                        Ingredient.of(TTItemTags.TRIMMABLE_ARMOR),
+                        Ingredient.of(TTItemTags.TRIM_MATERIALS),
+                        RecipeCategory.MISC)
+                .unlocks("has_smithing_trim_template", has(template))
+                .save(output, TTIds.rl("smithing/" + pattern.location().getPath() + "_armor_trim"));
+        copySmithingTemplate(output, template, duplicationBase);
     }
 
     private void buildTravellerBootsRecipe() {
@@ -2491,6 +2516,51 @@ public final class TTRecipeProvider extends RecipeProvider {
                 .instability(2)
                 .gate(gate("mirror_essentia"))
                 .unlockedBy("has", has(TTItems.MIRRORED_GLASS))
+                .save(output);
+
+        arcaneShaped(new ItemStack(TTItems.THAUMIUM_SHIELD.get()), 60)
+                .aspect(TTAspects.TERRA, 2)
+                .aspect(TTAspects.ORDO, 1)
+                .pattern("GGG")
+                .pattern("TTT")
+                .pattern(" G ")
+                .define('G', TTItemTags.PLANKS_GREATWOOD)
+                .define('T', TTItemTags.PLATES_THAUMIUM)
+                .gate(gate("thaumium_shield"))
+                .unlockedBy("has", has(TTItemTags.PLATES_THAUMIUM))
+                .save(output);
+        new InfusionRecipeBuilder(
+                        registries.lookupOrThrow(IAspect.REGISTRY_KEY),
+                        RecipeCategory.COMBAT,
+                        new ItemStack(TTItems.MIRROR_SHIELD.get()),
+                        Ingredient.of(Items.SHIELD))
+                .component(Ingredient.of(TTItems.MIRRORED_GLASS.get()))
+                .component(Ingredient.of(Tags.Items.INGOTS_GOLD))
+                .component(Ingredient.of(Tags.Items.INGOTS_GOLD))
+                .component(Ingredient.of(Tags.Items.INGOTS_GOLD))
+                .aspect(TTAspects.PRAEMUNIO, 30)
+                .aspect(TTAspects.PERMUTATIO, 25)
+                .aspect(TTAspects.MOTUS, 25)
+                .instability(5)
+                .gate(gate("mirror_shield"))
+                .unlockedBy("has", has(TTItems.MIRRORED_GLASS))
+                .save(output);
+        new InfusionRecipeBuilder(
+                        registries.lookupOrThrow(IAspect.REGISTRY_KEY),
+                        RecipeCategory.COMBAT,
+                        new ItemStack(TTItems.VOID_SHIELD.get()),
+                        Ingredient.of(TTItems.THAUMIUM_SHIELD.get()))
+                .component(Ingredient.of(TTItemTags.PLATES_VOID_METAL))
+                .component(Ingredient.of(TTItemTags.PLANKS_SILVERWOOD))
+                .component(Ingredient.of(TTItemTags.PLATES_VOID_METAL))
+                .component(Ingredient.of(TTItemTags.PLATES_VOID_METAL))
+                .aspect(TTAspects.ALIENIS, 25)
+                .aspect(TTAspects.METALLUM, 25)
+                .aspect(TTAspects.PRAEMUNIO, 35)
+                .aspect(TTAspects.VACUOS, 25)
+                .instability(8)
+                .gate(gate("void_shield"))
+                .unlockedBy("has", has(TTItems.THAUMIUM_SHIELD))
                 .save(output);
 
         arcaneShaped(new ItemStack(TTItems.MATRIX_SPEED.get()), 500)

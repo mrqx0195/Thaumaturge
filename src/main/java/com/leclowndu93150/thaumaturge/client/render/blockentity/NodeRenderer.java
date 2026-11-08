@@ -9,14 +9,15 @@ import com.leclowndu93150.thaumaturge.client.effect.LateWorldRenderQueue;
 import com.leclowndu93150.thaumaturge.client.render.NodeAnimation;
 import com.leclowndu93150.thaumaturge.client.render.NodeTexture;
 import com.leclowndu93150.thaumaturge.client.render.TTRenderTypes;
+import com.leclowndu93150.thaumaturge.client.space.ClientSpaces;
 import com.leclowndu93150.thaumaturge.compat.iris.IrisCompat;
-import com.leclowndu93150.thaumaturge.compat.sable.SableClientCompat;
 import com.leclowndu93150.thaumaturge.content.aura.node.BlockEntityJarNode;
 import com.leclowndu93150.thaumaturge.content.aura.node.BlockEntityNode;
 import com.leclowndu93150.thaumaturge.content.item.ThaumometerItem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -29,6 +30,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -83,7 +85,11 @@ public final class NodeRenderer implements BlockEntityRenderer<BlockEntityNode> 
 
     @Override
     public AABB getRenderBoundingBox(BlockEntityNode node) {
-        return new AABB(node.getBlockPos()).inflate(ORB_SWEEP);
+        AABB bounds = new AABB(node.getBlockPos()).inflate(ORB_SWEEP);
+        UUID drainId = node.getDrainPlayer();
+        Level level = node.getLevel();
+        Player drainer = drainId == null || level == null ? null : level.getPlayerByUUID(drainId);
+        return drainer == null ? bounds : bounds.minmax(drainer.getBoundingBox());
     }
 
     @Override
@@ -112,7 +118,7 @@ public final class NodeRenderer implements BlockEntityRenderer<BlockEntityNode> 
         if (data.jarred) {
             poseStack.pushPose();
             poseStack.translate(0.5F, JARRED_HEIGHT, 0.5F);
-            SableClientCompat.faceCamera(
+            ClientSpaces.faceCamera(
                     node.getLevel(),
                     origin,
                     poseStack,
@@ -183,7 +189,7 @@ public final class NodeRenderer implements BlockEntityRenderer<BlockEntityNode> 
                 && drainer.isUsingItem()) {
             float useTicks = drainer.getTicksUsingItem() + partialTicks;
             Vec3 hand = drainHand(drainer, player, partialTicks);
-            Vec3 nodeCenter = SableClientCompat.renderPosition(node.getLevel(), Vec3.atCenterOf(node.getBlockPos()));
+            Vec3 nodeCenter = ClientSpaces.renderPosition(node.getLevel(), Vec3.atCenterOf(node.getBlockPos()));
             state.draining = true;
             state.drainFromX = hand.x - nodeCenter.x;
             state.drainFromY = hand.y - nodeCenter.y;
@@ -240,7 +246,7 @@ public final class NodeRenderer implements BlockEntityRenderer<BlockEntityNode> 
     public static void forEachLayer(NodeRenderState state, LayerSink sink) {
         int frame = Math.floorMod(Mth.floor(state.ticks * FRAME_ADVANCE_PER_TICK) + state.frameSeed, GRID);
         if (!state.visible || state.layers.isEmpty()) {
-            float faintAlpha = IrisCompat.shadersActive() ? IRIS_FAINT_ALPHA : FAINT_ALPHA;
+            float faintAlpha = IrisCompat.overridesShaders() ? IRIS_FAINT_ALPHA : FAINT_ALPHA;
             RenderType faintType = state.visible && state.depthIgnore ? NODE_ADDITIVE_NO_DEPTH : NODE_ADDITIVE;
             sink.layer(0, faintType, 0.0F, FAINT_SCALE, faintAlpha, 0xFFFFFF, STRIP_NORMAL, frame);
             return;

@@ -1,17 +1,23 @@
 package com.leclowndu93150.thaumaturge.data.tag;
 
 import com.leclowndu93150.thaumaturge.TTIds;
+import com.leclowndu93150.thaumaturge.content.equipment.CultistArmorDyeing;
 import com.leclowndu93150.thaumaturge.registry.TTBlockTags;
 import com.leclowndu93150.thaumaturge.registry.TTItemTags;
 import com.leclowndu93150.thaumaturge.registry.TTItems;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.tags.ItemTagsProvider;
 import net.minecraft.data.tags.TagsProvider;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagEntry;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
@@ -129,6 +135,56 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.SEAL_PROVIDER.get(),
                         TTItems.SEAL_STOCK.get());
         tag(TTItemTags.RESEARCH_NOTES).add(TTItems.RESEARCH_NOTE.get(), TTItems.CELESTIAL_NOTES.get());
+        tag(TTItemTags.TRIM_MATERIALS)
+                .add(TTItems.INGOT_THAUMIUM.get(), TTItems.INGOT_VOID.get(), TTItems.ESSENTIA_CRYSTAL.get());
+        tag(ItemTags.TRIM_MATERIALS).add(TTItems.INGOT_BRASS.get()).addTag(TTItemTags.TRIM_MATERIALS);
+        tag(ItemTags.TRIMMABLE_ARMOR)
+                .add(
+                        TTItems.THAUMIUM_HELM.get(),
+                        TTItems.THAUMIUM_CHEST.get(),
+                        TTItems.THAUMIUM_LEGS.get(),
+                        TTItems.THAUMIUM_BOOTS.get(),
+                        TTItems.VOID_HELM.get(),
+                        TTItems.VOID_CHEST.get(),
+                        TTItems.VOID_LEGS.get(),
+                        TTItems.VOID_BOOTS.get(),
+                        TTItems.CLOTH_CHEST.get(),
+                        TTItems.CLOTH_LEGS.get(),
+                        TTItems.CLOTH_BOOTS.get(),
+                        TTItems.GOGGLES_REVEALING.get(),
+                        TTItems.TRAVELLER_BOOTS.get());
+        tag(TTItemTags.MODELLED_TRIMMABLE_ARMOR)
+                .add(
+                        TTItems.CRIMSON_PLATE_HELM.get(),
+                        TTItems.CRIMSON_PLATE_CHEST.get(),
+                        TTItems.CRIMSON_PLATE_LEGS.get(),
+                        TTItems.CRIMSON_RANGER_HELM.get(),
+                        TTItems.CRIMSON_RANGER_CHEST.get(),
+                        TTItems.CRIMSON_RANGER_LEGS.get(),
+                        TTItems.CRIMSON_CAPTAIN_HELM.get(),
+                        TTItems.CRIMSON_CAPTAIN_CHEST.get(),
+                        TTItems.CRIMSON_ROBE_HELM.get(),
+                        TTItems.CRIMSON_ROBE_CHEST.get(),
+                        TTItems.CRIMSON_ROBE_LEGS.get(),
+                        TTItems.CRIMSON_BOOTS.get(),
+                        TTItems.CRIMSON_PRAETOR_HELM.get(),
+                        TTItems.CRIMSON_PRAETOR_CHEST.get(),
+                        TTItems.CRIMSON_PRAETOR_LEGS.get(),
+                        TTItems.VOID_ROBE_HELM.get(),
+                        TTItems.VOID_ROBE_CHEST.get(),
+                        TTItems.VOID_ROBE_LEGS.get(),
+                        TTItems.FORTRESS_HELM.get(),
+                        TTItems.FORTRESS_CHEST.get(),
+                        TTItems.FORTRESS_LEGS.get(),
+                        TTItems.THAUMOSTATIC_HARNESS.get());
+        tag(TTItemTags.TRIMMABLE_ARMOR).addTag(ItemTags.TRIMMABLE_ARMOR).addTag(TTItemTags.MODELLED_TRIMMABLE_ARMOR);
+        tag(ItemTags.BOOKSHELF_BOOKS)
+                .add(
+                        TTItems.THAUMONOMICON.get(),
+                        TTItems.THAUMONOMICON_CHEAT.get(),
+                        TTItems.THAUMONOMICON_SHARING.get(),
+                        TTItems.THAUMONOMICON_LINKING.get(),
+                        TTItems.CURIO_RITES.get());
         tag(TTItemTags.LOOT_CONTAINERS)
                 .add(
                         TTItems.LOOT_BAG_COMMON.get(),
@@ -156,11 +212,23 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
         copy(Tags.Blocks.ORES_IN_GROUND_STONE, Tags.Items.ORES_IN_GROUND_STONE);
         copy(Tags.Blocks.ORES_IN_GROUND_DEEPSLATE, Tags.Items.ORES_IN_GROUND_DEEPSLATE);
         tag(Tags.Items.ORES).addTags(TTItemTags.ORES_AMBER, TTItemTags.ORES_CINNABAR, TTItemTags.ORES_QUARTZ);
+        tag(TTItemTags.DT_BRANCHES_THAT_BURN)
+                .add(TagEntry.optionalElement(TTIds.DT_SILVERWOOD_BRANCH))
+                .add(TagEntry.optionalElement(TTIds.DT_GREATWOOD_BRANCH));
+        tag(TTItemTags.SCANNABLE_DYNAMIC_TREE_BRANCHES)
+                .addOptionalTag(TagKey.create(
+                        Registries.ITEM, ResourceLocation.fromNamespaceAndPath(TTIds.DYNAMIC_TREES, "branches")))
+                .addOptionalTag(TTItemTags.DT_BRANCHES_THAT_BURN);
+        tag(TTItemTags.DT_SEEDS)
+                .add(TagEntry.optionalElement(TTIds.DT_SILVERWOOD_SEED))
+                .add(TagEntry.optionalElement(TTIds.DT_GREATWOOD_SEED));
         tag(TTItemTags.RAW_MATERIALS_CINNABAR).add(TTItems.RAW_CINNABAR.get());
         tag(Tags.Items.RAW_MATERIALS).addTag(TTItemTags.RAW_MATERIALS_CINNABAR);
         tag(TTItemTags.SCAN_IRON).addTags(Tags.Items.ORES_IRON, Tags.Items.INGOTS_IRON, Tags.Items.STORAGE_BLOCKS_IRON);
 
         copy(TTBlockTags.STORAGE_BLOCKS_AMBER, TTItemTags.STORAGE_BLOCKS_AMBER);
+        copy(TTBlockTags.STORAGE_BLOCKS_FLESH, TTItemTags.STORAGE_BLOCKS_FLESH);
+        copy(TTBlockTags.STORAGE_BLOCKS_TALLOW, TTItemTags.STORAGE_BLOCKS_TALLOW);
         copy(TTBlockTags.STORAGE_BLOCKS_BRASS, TTItemTags.STORAGE_BLOCKS_BRASS);
         copy(TTBlockTags.STORAGE_BLOCKS_THAUMIUM, TTItemTags.STORAGE_BLOCKS_THAUMIUM);
         copy(TTBlockTags.STORAGE_BLOCKS_VOID_METAL, TTItemTags.STORAGE_BLOCKS_VOID_METAL);
@@ -169,7 +237,9 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItemTags.STORAGE_BLOCKS_AMBER,
                         TTItemTags.STORAGE_BLOCKS_BRASS,
                         TTItemTags.STORAGE_BLOCKS_THAUMIUM,
-                        TTItemTags.STORAGE_BLOCKS_VOID_METAL);
+                        TTItemTags.STORAGE_BLOCKS_VOID_METAL,
+                        TTItemTags.STORAGE_BLOCKS_FLESH,
+                        TTItemTags.STORAGE_BLOCKS_TALLOW);
 
         tag(TTItemTags.INGOTS_BRASS).add(TTItems.INGOT_BRASS.get());
         tag(TTItemTags.INGOTS_THAUMIUM).add(TTItems.INGOT_THAUMIUM.get());
@@ -245,7 +315,8 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CLOTH_BOOTS.get(),
                         TTItems.VOID_ROBE_HELM.get(),
                         TTItems.VOID_ROBE_CHEST.get(),
-                        TTItems.VOID_ROBE_LEGS.get());
+                        TTItems.VOID_ROBE_LEGS.get())
+                .add(CultistArmorDyeing.dyeableArmor().toArray(Item[]::new));
 
         tag(CuriosTags.BACK).add(TTItems.THAUMOSTATIC_HARNESS.get());
         tag(ItemTags.CHEST_ARMOR).add(TTItems.THAUMOSTATIC_HARNESS.get());
@@ -286,6 +357,18 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
         tag(ItemTags.SHOVELS)
                 .add(TTItems.THAUMIUM_SHOVEL.get(), TTItems.VOID_SHOVEL.get(), TTItems.ELEMENTAL_SHOVEL.get());
         tag(ItemTags.HOES).add(TTItems.THAUMIUM_HOE.get(), TTItems.VOID_HOE.get(), TTItems.ELEMENTAL_HOE.get());
+        tag(TTItemTags.TAINT_TOOLS)
+                .add(
+                        TTItems.THAUMIUM_HOE.get(),
+                        TTItems.VOID_HOE.get(),
+                        TTItems.ELEMENTAL_HOE.get(),
+                        TTItems.PRIMAL_CRUSHER.get());
+        Item[] shields = {TTItems.THAUMIUM_SHIELD.get(), TTItems.MIRROR_SHIELD.get(), TTItems.VOID_SHIELD.get()};
+        tag(Tags.Items.TOOLS_SHIELD).add(shields);
+        tag(ItemTags.DURABILITY_ENCHANTABLE).add(shields);
+        tag(TTItemTags.SHIELDS_WARDING).add(TTItems.THAUMIUM_SHIELD.get(), TTItems.VOID_SHIELD.get());
+        tag(TTItemTags.SHIELDS_REFLECTING).add(TTItems.MIRROR_SHIELD.get());
+        tag(TTItemTags.SHIELDS_SAPPING).add(TTItems.VOID_SHIELD.get());
 
         tag(ItemTags.HEAD_ARMOR)
                 .add(
@@ -296,7 +379,9 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CRIMSON_PLATE_HELM.get(),
                         TTItems.CRIMSON_ROBE_HELM.get(),
                         TTItems.CRIMSON_PRAETOR_HELM.get(),
-                        TTItems.GOGGLES_REVEALING.get());
+                        TTItems.GOGGLES_REVEALING.get(),
+                        TTItems.CRIMSON_RANGER_HELM.get(),
+                        TTItems.CRIMSON_CAPTAIN_HELM.get());
         tag(ItemTags.CHEST_ARMOR)
                 .add(
                         TTItems.THAUMIUM_CHEST.get(),
@@ -306,7 +391,9 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CLOTH_CHEST.get(),
                         TTItems.CRIMSON_PLATE_CHEST.get(),
                         TTItems.CRIMSON_ROBE_CHEST.get(),
-                        TTItems.CRIMSON_PRAETOR_CHEST.get());
+                        TTItems.CRIMSON_PRAETOR_CHEST.get(),
+                        TTItems.CRIMSON_RANGER_CHEST.get(),
+                        TTItems.CRIMSON_CAPTAIN_CHEST.get());
         tag(ItemTags.LEG_ARMOR)
                 .add(
                         TTItems.THAUMIUM_LEGS.get(),
@@ -316,7 +403,8 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CLOTH_LEGS.get(),
                         TTItems.CRIMSON_PLATE_LEGS.get(),
                         TTItems.CRIMSON_ROBE_LEGS.get(),
-                        TTItems.CRIMSON_PRAETOR_LEGS.get());
+                        TTItems.CRIMSON_PRAETOR_LEGS.get(),
+                        TTItems.CRIMSON_RANGER_LEGS.get());
         tag(ItemTags.FOOT_ARMOR)
                 .add(
                         TTItems.THAUMIUM_BOOTS.get(),
@@ -334,7 +422,9 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CRIMSON_PLATE_HELM.get(),
                         TTItems.CRIMSON_ROBE_HELM.get(),
                         TTItems.CRIMSON_PRAETOR_HELM.get(),
-                        TTItems.GOGGLES_REVEALING.get());
+                        TTItems.GOGGLES_REVEALING.get(),
+                        TTItems.CRIMSON_RANGER_HELM.get(),
+                        TTItems.CRIMSON_CAPTAIN_HELM.get());
         tag(TTItemTags.ARMORS_CHESTPLATES)
                 .add(
                         TTItems.THAUMIUM_CHEST.get(),
@@ -344,7 +434,9 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CLOTH_CHEST.get(),
                         TTItems.CRIMSON_PLATE_CHEST.get(),
                         TTItems.CRIMSON_ROBE_CHEST.get(),
-                        TTItems.CRIMSON_PRAETOR_CHEST.get());
+                        TTItems.CRIMSON_PRAETOR_CHEST.get(),
+                        TTItems.CRIMSON_RANGER_CHEST.get(),
+                        TTItems.CRIMSON_CAPTAIN_CHEST.get());
         tag(TTItemTags.ARMORS_LEGGINGS)
                 .add(
                         TTItems.THAUMIUM_LEGS.get(),
@@ -354,7 +446,8 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.CLOTH_LEGS.get(),
                         TTItems.CRIMSON_PLATE_LEGS.get(),
                         TTItems.CRIMSON_ROBE_LEGS.get(),
-                        TTItems.CRIMSON_PRAETOR_LEGS.get());
+                        TTItems.CRIMSON_PRAETOR_LEGS.get(),
+                        TTItems.CRIMSON_RANGER_LEGS.get());
         tag(TTItemTags.ARMORS_BOOTS)
                 .add(
                         TTItems.THAUMIUM_BOOTS.get(),
@@ -372,6 +465,16 @@ public final class TTItemTagsProvider extends ItemTagsProvider {
                         TTItems.THAUMIUM_AXE.get(),
                         TTItems.VOID_AXE.get(),
                         TTItems.ELEMENTAL_AXE.get());
+        tag(TTItemTags.CURIOSITIES)
+                .add(
+                        TTItems.CURIO_ARCANE.get(),
+                        TTItems.CURIO_PRESERVED.get(),
+                        TTItems.CURIO_ANCIENT.get(),
+                        TTItems.CURIO_ELDRITCH.get(),
+                        TTItems.CURIO_KNOWLEDGE.get(),
+                        TTItems.CURIO_TWISTED.get(),
+                        TTItems.CURIO_RITES.get(),
+                        TTItems.PECH_WAND.get());
         tag(Tags.Items.MINING_TOOL_TOOLS)
                 .add(
                         TTItems.THAUMIUM_PICKAXE.get(),

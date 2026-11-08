@@ -30,6 +30,8 @@ import com.leclowndu93150.thaumaturge.client.screen.AbstractTTScreen;
 import com.leclowndu93150.thaumaturge.client.screen.TTScreenTextures;
 import com.leclowndu93150.thaumaturge.client.screen.TTTooltips;
 import com.leclowndu93150.thaumaturge.client.screen.tooltip.DeferredTooltip;
+import com.leclowndu93150.thaumaturge.client.screen.widget.TTButton;
+import com.leclowndu93150.thaumaturge.client.screen.widget.TTImageButton;
 import com.leclowndu93150.thaumaturge.content.research.ResearchManager;
 import com.leclowndu93150.thaumaturge.content.research.note.ResearchNoteData;
 import com.leclowndu93150.thaumaturge.content.research.note.ResearchNotes;
@@ -83,11 +85,12 @@ public final class EntryDetailScreen extends AbstractTTScreen {
     private static final int PANE_H = 181;
     private static final float PANE_SCALE = 1.3F;
 
-    private static final int PAGE_WIDTH = 140;
-    private static final int PAGE_LEFT_OFFSET = -15;
-    private static final int PAGE_SIDE_OFFSET = 152;
+    private static final int PAGE_WIDTH = PageParser.PAGE_WIDTH;
+    private static final int PAGE_LEFT_OFFSET = -13;
+    private static final int PAGE_SIDE_OFFSET = 151;
     private static final int CONTENT_Y_OFFSET = -10;
     private static final int TITLE_Y_ADVANCE = 28;
+    private static final int CONTINUATION_Y_SHIFT = 4;
 
     private static final int LINE_HEIGHT = 9;
     private static final int TEXT_LINE_COLOR = 0xFF000000;
@@ -299,6 +302,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
     private int currentPage;
     private int sw;
     private int sh;
+    private @Nullable TTButton returnControl;
     private List<PageParser.Page> parsedPages = List.of();
     private boolean showingAspects;
     private boolean showingKnowledge;
@@ -348,6 +352,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
         super.init();
         sw = (width - PANE_W) / 2;
         sh = (height - PANE_H) / 2;
+        returnControl = addRenderableWidget(createReturnControl());
         currentPage = clampPage(currentPage);
         for (IResearchStage stage : entry.value().stages()) {
             for (ResourceLocation recipeId : stage.recipes()) {
@@ -365,6 +370,25 @@ public final class EntryDetailScreen extends AbstractTTScreen {
                     entryId, List.of(ResearchFlag.RESEARCH, ResearchFlag.PAGE)));
             flagsCleared = true;
         }
+    }
+
+    private TTButton createReturnControl() {
+        TTButton control = new TTImageButton(
+                width / 2 - BACK_W / 2,
+                Math.max(4, sh - 46),
+                BACK_W,
+                21,
+                TTScreenTextures.RESEARCH_BOOK,
+                BACK_U,
+                BACK_V,
+                BACK_W,
+                BACK_H,
+                TTScreenTextures.TEX_SIZE,
+                TTScreenTextures.TEX_SIZE,
+                Component.translatable("gui.thaumaturge.thaumonomicon.return_control"),
+                this::returnToBrowser);
+        control.setDescription(Component.translatable("gui.thaumaturge.thaumonomicon.return_control.description"));
+        return control;
     }
 
     private void rebuildPages() {
@@ -586,7 +610,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
             renderedAspectHits.clear();
         }
         graphics.flush();
-        if (knowsResearch(KNOWLEDGETYPES_RESEARCH) && entryId.equals(KNOWLEDGETYPES_RESEARCH)) {
+        if (currentPage == 0 && knowsResearch(KNOWLEDGETYPES_RESEARCH) && entryId.equals(KNOWLEDGETYPES_RESEARCH)) {
             drawKnowledges(graphics, sw, sh + KNOW_INPAGE_INSERT_INPAGE_Y_OFFSET - 16, pageMouseX, pageMouseY, true);
         }
         graphics.pose().pushPose();
@@ -646,6 +670,8 @@ public final class EntryDetailScreen extends AbstractTTScreen {
             renderTitle(graphics, x, currentY);
             drawDivider(graphics, x + 4, currentY + 10);
             currentY += TITLE_Y_ADVANCE;
+        } else {
+            currentY += CONTINUATION_Y_SHIFT;
         }
         int textX = x + PAGE_LEFT_OFFSET + side * PAGE_SIDE_OFFSET;
         for (PageParser.PageElement element : page.elements()) {
@@ -655,7 +681,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
                 graphics.drawString(font, sequence, textX, currentY - 6, TEXT_LINE_COLOR, false);
                 currentY += LINE_HEIGHT;
                 if (text.paragraphBreak()) {
-                    currentY += (int) (LINE_HEIGHT * 0.66F);
+                    currentY += page.paragraphGap();
                 }
             } else if (element instanceof PageParser.PageElement.Image image) {
                 PageParser.PageImage pi = image.image();
@@ -2147,7 +2173,10 @@ public final class EntryDetailScreen extends AbstractTTScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 1) {
+        if (returnControl != null && super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
             returnToBrowser();
             return true;
         }
@@ -2243,8 +2272,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
                         && mx < aspectNavLeftX + 14
                         && my >= aspectNavY
                         && my < aspectNavY + 14) {
-                    aspectsPage--;
-                    playSound(TTSounds.PAGE.get(), 0.7F, 0.9F);
+                    stepAspectsPage(-1);
                     return true;
                 }
                 if (aspectsPage < maxAspectPages() - 1
@@ -2252,8 +2280,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
                         && mx < aspectNavRightX + 14
                         && my >= aspectNavY
                         && my < aspectNavY + 14) {
-                    aspectsPage++;
-                    playSound(TTSounds.PAGE.get(), 0.7F, 0.9F);
+                    stepAspectsPage(1);
                     return true;
                 }
             }
@@ -2315,9 +2342,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
                         && mx < recipeNavLeftX + 14
                         && my >= recipeNavY
                         && my < recipeNavY + 14) {
-                    recipePage--;
-                    resetConstructPreview();
-                    playSound(TTSounds.PAGE.get(), 0.7F, 0.9F);
+                    stepRecipeVariant(-1);
                     return true;
                 }
                 if (recipePage < max
@@ -2325,9 +2350,7 @@ public final class EntryDetailScreen extends AbstractTTScreen {
                         && mx < recipeNavRightX + 14
                         && my >= recipeNavY
                         && my < recipeNavY + 14) {
-                    recipePage++;
-                    resetConstructPreview();
-                    playSound(TTSounds.PAGE.get(), 0.7F, 0.9F);
+                    stepRecipeVariant(1);
                     return true;
                 }
             }
@@ -2686,21 +2709,60 @@ public final class EntryDetailScreen extends AbstractTTScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (insertOpen() || scrollY == 0.0) {
+        if (scrollY == 0.0) {
             return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
-        if (hasShiftDown()) {
+        int step = scrollY < 0.0 ? 1 : -1;
+        if (showingAspects) {
+            stepAspectsPage(step);
+            return true;
+        }
+        if (shownRecipe != null) {
+            stepRecipeVariant(step);
+            return true;
+        }
+        if (insertOpen()) {
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
+        boolean overStages = canNavigateStageHistory() && overStageStrip(mouseX, mouseY);
+        if (overStages || hasShiftDown()) {
             if (hasStageHistory()) {
-                stepHistoryStage(scrollY > 0.0 ? -1 : 1);
+                stepHistoryStage(step);
             }
             return true;
         }
-        if (scrollY > 0.0) {
-            prevPage();
-        } else {
+        if (step > 0) {
             nextPage();
+        } else {
+            prevPage();
         }
         return true;
+    }
+
+    private boolean overStageStrip(double mx, double my) {
+        int left = sw + STAGE_HISTORY_LEFT_X - 1;
+        int right = sw + STAGE_HISTORY_RIGHT_X - 1 + STAGE_HISTORY_HIT_SIZE;
+        int top = sh + STAGE_HISTORY_HIT_Y;
+        return mx >= left && mx < right && my >= top && my < top + STAGE_HISTORY_HIT_SIZE;
+    }
+
+    private void stepAspectsPage(int delta) {
+        int target = aspectsPage + delta;
+        if (target < 0 || target >= maxAspectPages()) {
+            return;
+        }
+        aspectsPage = target;
+        playSound(TTSounds.PAGE.get(), 0.7F, 0.9F);
+    }
+
+    private void stepRecipeVariant(int delta) {
+        int target = recipePage + delta;
+        if (target < 0 || target >= RecipeDisplayCache.get(shownRecipe).size()) {
+            return;
+        }
+        recipePage = target;
+        resetConstructPreview();
+        playSound(TTSounds.PAGE.get(), 0.7F, 0.9F);
     }
 
     @Override

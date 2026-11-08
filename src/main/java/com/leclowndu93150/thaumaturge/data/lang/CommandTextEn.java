@@ -13,6 +13,9 @@ public final class CommandTextEn {
         add.accept("commands.thaumaturge.research.unknown_category", "Unknown research category: %s");
         add.accept("commands.thaumaturge.research.reset", "Reset research and knowledge for %s");
         add.accept("commands.thaumaturge.research.everything", "Completed all research for %s (%s entries)");
+        add.accept("commands.thaumaturge.scan.everything", "Scanned %s things for %s");
+        add.accept("commands.thaumaturge.patrol.spawned", "Spawned a crimson ranger patrol at %s, %s, %s");
+        add.accept("commands.thaumaturge.patrol.failed", "There is no room for a crimson ranger captain there");
         add.accept("commands.thaumaturge.research.stage", "Set %s to the %s stage (%s research completed)");
         add.accept(
                 "commands.thaumaturge.research.category", "Completed the %s category for %s (%s research completed)");
@@ -48,7 +51,6 @@ public final class CommandTextEn {
         add.accept(
                 "commands.thaumaturge.locate.node.not_found",
                 "No indexed %s node found beyond 10 blocks in this dimension. Nodes are indexed as chunks load.");
-        add.accept("commands.thaumaturge.locate.node.copy", "Click to copy coordinates");
         add.accept("commands.thaumaturge.locate.node.found", "Nearest indexed %s node is at %s (%s blocks away)");
 
         add.accept(
@@ -85,6 +87,17 @@ public final class CommandTextEn {
         add.accept("commands.thaumaturge.tools.aspect.all", "Granted %s research points to all %s aspects");
         add.accept("commands.thaumaturge.tools.aspect.one", "Granted %s research points of %s");
         add.accept("commands.thaumaturge.tools.jar.given", "Gave a jar containing %s essentia of %s");
+        add.accept(
+                "commands.thaumaturge.tools.reservoir.usage",
+                "Usage: /tt reservoir <aspect> <amount> [<aspect> <amount> ...]");
+        add.accept("commands.thaumaturge.tools.reservoir.pairs", "Provide one or more aspect and amount pairs");
+        add.accept("commands.thaumaturge.tools.reservoir.bad_amount", "Amounts must be positive whole numbers: %s");
+        add.accept(
+                "commands.thaumaturge.tools.reservoir.capacity",
+                "Total amount cannot exceed the reservoir capacity of %s");
+        add.accept(
+                "commands.thaumaturge.tools.reservoir.given",
+                "Gave a reservoir containing %s essentia across %s aspect types");
         add.accept("commands.thaumaturge.tools.warp.info", "Warp: permanent %s, normal %s, temporary %s, counter %s");
         add.accept("commands.thaumaturge.tools.warp.unknown_type", "Unknown warp type: %s");
         add.accept("commands.thaumaturge.tools.warp.added", "Added %s %s warp");
@@ -145,6 +158,7 @@ public final class CommandTextEn {
                 "commands.thaumaturge.tools.node.pairs",
                 "Aspects must come in pairs: <aspect> <amount> [<aspect> <amount> ...]");
         add.accept("commands.thaumaturge.tools.node.bad_amount", "Amounts must be positive whole numbers: %s");
+        add.accept("commands.thaumaturge.tools.node.capacity", "Total aspect amount is too large: %s");
         add.accept("commands.thaumaturge.tools.link.removed", "Removed %s research links");
         add.accept("commands.thaumaturge.tools.unknown_spell_part", "Unknown spell part: %s");
     }

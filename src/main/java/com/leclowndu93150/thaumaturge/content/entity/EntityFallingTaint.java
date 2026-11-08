@@ -1,5 +1,6 @@
 package com.leclowndu93150.thaumaturge.content.entity;
 
+import com.leclowndu93150.thaumaturge.content.world.space.LevelSpaces;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.leclowndu93150.thaumaturge.registry.TTEntities;
 import com.leclowndu93150.thaumaturge.registry.TTSounds;
@@ -27,6 +28,9 @@ public final class EntityFallingTaint extends Entity implements IEntityWithCompl
     private static final float MOTION_DAMP = 0.98F;
     private static final float LANDING_DAMP_HORIZONTAL = 0.7F;
     private static final float LANDING_DAMP_VERTICAL = -0.5F;
+    private static final double GRAVITY = 0.04;
+    private static final float LAND_VOLUME = 0.5F;
+    private static final float LAND_PITCH = 1.0F;
 
     private BlockState fallTile = TTBlocks.TAINT_CRUST.get().defaultBlockState();
     private BlockPos originPos = BlockPos.ZERO;
@@ -60,17 +64,16 @@ public final class EntityFallingTaint extends Entity implements IEntityWithCompl
 
     @Override
     public void tick() {
-        super.tick();
         if (this.fallTile.isAir()) {
             this.discard();
             return;
         }
-        this.xo = this.getX();
-        this.yo = this.getY();
-        this.zo = this.getZ();
+        if (this.level() instanceof ServerLevel server && !clearOrigin(server)) {
+            return;
+        }
 
         if (!this.isNoGravity()) {
-            this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.04, 0.0));
+            this.setDeltaMovement(this.getDeltaMovement().add(0.0, -GRAVITY, 0.0));
         }
 
         this.move(MoverType.SELF, this.getDeltaMovement());
@@ -78,16 +81,7 @@ public final class EntityFallingTaint extends Entity implements IEntityWithCompl
         if (!(this.level() instanceof ServerLevel server)) {
             return;
         }
-        BlockPos here = this.blockPosition();
-
-        if (fallTime == 0) {
-            BlockState atOrigin = server.getBlockState(originPos);
-            if (!atOrigin.is(fallTile.getBlock())) {
-                this.discard();
-                return;
-            }
-            server.setBlock(originPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-        }
+        BlockPos here = LevelSpaces.localBlock(this);
 
         fallTime++;
 
@@ -107,7 +101,7 @@ public final class EntityFallingTaint extends Entity implements IEntityWithCompl
         } else {
             this.setDeltaMovement(this.getDeltaMovement()
                     .multiply(LANDING_DAMP_HORIZONTAL, LANDING_DAMP_VERTICAL, LANDING_DAMP_HORIZONTAL));
-            server.playSound(null, here, TTSounds.GORE.get(), SoundSource.BLOCKS, 0.5F, 1.0F);
+            server.playSound(null, here, TTSounds.GORE.get(), SoundSource.BLOCKS, LAND_VOLUME, LAND_PITCH);
             this.discard();
             BlockState landingState = server.getBlockState(here);
             if (landingState.canBeReplaced() || landingState.isAir() || landingState.is(TTBlocks.FLUX_GOO.get())) {
@@ -117,6 +111,18 @@ public final class EntityFallingTaint extends Entity implements IEntityWithCompl
         }
 
         this.setDeltaMovement(this.getDeltaMovement().scale(MOTION_DAMP));
+    }
+
+    private boolean clearOrigin(ServerLevel server) {
+        if (fallTime != 0) {
+            return true;
+        }
+        if (!server.getBlockState(originPos).is(fallTile.getBlock())) {
+            this.discard();
+            return false;
+        }
+        server.setBlock(originPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        return true;
     }
 
     @Override

@@ -11,15 +11,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 
-/**
- * Persistent index used by the node locator command. Unloaded chunks are never loaded to populate
- * it; {@link BlockEntityNode} registers nodes as their chunks naturally load.
- */
 public final class NodeLocationIndex extends SavedData {
     private static final String DATA_NAME = "thaumaturge_node_locations";
     private static final double REACHED_DISTANCE_SQ = 10.0 * 10.0;
@@ -66,11 +63,11 @@ public final class NodeLocationIndex extends SavedData {
     public Optional<BlockPos> findNearest(BlockPos origin, NodeType type) {
         return nodes.get(type).stream()
                 .filter(pos -> BlockPos.of(pos).distSqr(origin) > REACHED_DISTANCE_SQ)
-                .min(Comparator.comparingDouble(pos -> BlockPos.of(pos).distSqr(origin)))
+                .min(Comparator.comparingDouble((Long pos) -> BlockPos.of(pos).distSqr(origin))
+                        .thenComparingLong(Long::longValue))
                 .map(BlockPos::of);
     }
 
-    /** Returns the nearest indexed node of any type within {@code maxDistance}. */
     public Optional<BlockPos> findNearestAny(BlockPos origin, double maxDistance) {
         double maxDistanceSq = maxDistance * maxDistance;
         return nodes.values().stream()
@@ -84,14 +81,30 @@ public final class NodeLocationIndex extends SavedData {
     private static NodeLocationIndex load(CompoundTag tag, HolderLookup.Provider registries) {
         NodeLocationIndex index = new NodeLocationIndex();
         if (tag.contains("LegacyMigrationComplete")) {
-            // Rewrite legacy index data without the retired migration marker.
             index.setDirty();
         }
-        ListTag nodeList = tag.getList("Nodes", Tag.TAG_COMPOUND);
-        for (Tag value : nodeList) {
-            CompoundTag node = (CompoundTag) value;
-            parseType(node.getString("Type"))
-                    .ifPresent(type -> index.nodes.get(type).add(node.getLong("Pos")));
+        if (tag.contains("nodes", Tag.TAG_LIST)) {
+            ListTag nodeList = tag.getList("nodes", Tag.TAG_COMPOUND);
+            for (Tag value : nodeList) {
+                CompoundTag node = (CompoundTag) value;
+                BlockPos.CODEC
+                        .parse(NbtOps.INSTANCE, node.get("pos"))
+                        .result()
+                        .ifPresent(pos -> NodeType.CODEC
+                                .parse(NbtOps.INSTANCE, node.get("type"))
+                                .result()
+                                .ifPresent(type -> index.nodes.get(type).add(pos.asLong())));
+            }
+        } else {
+            ListTag nodeList = tag.getList("Nodes", Tag.TAG_COMPOUND);
+            for (Tag value : nodeList) {
+                CompoundTag node = (CompoundTag) value;
+                parseType(node.getString("Type"))
+                        .ifPresent(type -> index.nodes.get(type).add(node.getLong("Pos")));
+            }
+            if (!nodeList.isEmpty()) {
+                index.setDirty();
+            }
         }
         return index;
     }
@@ -101,11 +114,15 @@ public final class NodeLocationIndex extends SavedData {
         ListTag nodeList = new ListTag();
         nodes.forEach((type, positions) -> positions.forEach(pos -> {
             CompoundTag node = new CompoundTag();
-            node.putString("Type", type.getSerializedName());
-            node.putLong("Pos", pos);
+            node.put(
+                    "pos",
+                    BlockPos.CODEC
+                            .encodeStart(NbtOps.INSTANCE, BlockPos.of(pos))
+                            .getOrThrow());
+            node.put("type", NodeType.CODEC.encodeStart(NbtOps.INSTANCE, type).getOrThrow());
             nodeList.add(node);
         }));
-        tag.put("Nodes", nodeList);
+        tag.put("nodes", nodeList);
 
         return tag;
     }

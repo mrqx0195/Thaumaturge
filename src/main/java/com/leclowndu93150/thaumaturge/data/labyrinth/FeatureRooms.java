@@ -3,7 +3,6 @@ package com.leclowndu93150.thaumaturge.data.labyrinth;
 import static com.leclowndu93150.thaumaturge.data.labyrinth.RoomCanvas.F;
 
 import com.leclowndu93150.thaumaturge.content.eldritch.labyrinth.definition.RoomType;
-import com.leclowndu93150.thaumaturge.content.eldritch.labyrinth.marker.GuardianPostMarker;
 import com.leclowndu93150.thaumaturge.content.eldritch.labyrinth.marker.ReliquaryMarker;
 import com.leclowndu93150.thaumaturge.content.eldritch.labyrinth.marker.SpawnerMarker;
 import com.leclowndu93150.thaumaturge.registry.TTEntities;
@@ -22,7 +21,12 @@ final class FeatureRooms {
     private static final float SPIDER_LOOT = 0.5F;
     private static final float WEB_CHANCE = 0.75F;
     private static final float LIBRARY_LOOT = 0.4F;
-    private static final int[][] CRAB_SPAWNERS = {{5, 10}, {10, 10}};
+    private static final double NEST_RADIUS = 5.0;
+    private static final double NEST_SHELL = 6.0;
+    private static final double NEST_DOME_RISE = 2.5;
+    private static final double NEST_SHELL_RISE = 3.5;
+    private static final int NEST_VENT_SPACING = 3;
+    private static final float NEST_VENTS = 12.0F;
     private static final int[][] GUARDIAN_PILLARS = {{5, 7}, {10, 7}};
     private static final int[][] SPIDER_WEBS = {{4, 8}, {11, 8}, {6, 12}, {9, 13}, {7, 6}};
 
@@ -51,25 +55,24 @@ final class FeatureRooms {
     }
 
     static void crabs(RoomCanvas canvas) {
+        RoomShape cavity = RoomShape.cylinder(RoomKit.MID, NEST_DEPTH, NEST_RADIUS, F + 1, F + 5)
+                .or(RoomShape.dome(RoomKit.MID, F + 5, NEST_DEPTH, NEST_RADIUS, NEST_DOME_RISE, NEST_RADIUS));
+        canvas.fill(
+                RoomShape.cylinder(RoomKit.MID, NEST_DEPTH, NEST_SHELL, F, F + 5)
+                        .or(RoomShape.dome(RoomKit.MID, F + 5, NEST_DEPTH, NEST_SHELL, NEST_SHELL_RISE, NEST_SHELL)),
+                LabyrinthBlocks.crust());
         RoomKit.entrance(canvas, 5);
-        canvas.carve(RoomShape.cylinder(RoomKit.MID, NEST_DEPTH, 5.0, F + 1, F + 5));
-        canvas.carve(RoomShape.dome(RoomKit.MID, F + 5, NEST_DEPTH, 5.0, 2.5, 5.0));
+        canvas.carve(cavity);
         canvas.fill(RoomShape.box(6, F, 8, 9, F, 11), LabyrinthBlocks.glowingCrust());
-        for (int[] spawner : CRAB_SPAWNERS) {
-            canvas.marker(
-                    spawner[0],
-                    F,
-                    spawner[1],
-                    RoomKit.embedded(LabyrinthBlocks.crabSpawner(), 1.0F, LabyrinthBlocks.rock()));
-        }
         canvas.marker(7, F + 1, 13, RoomKit.crates(NEST_LOOT));
+        RoomKit.scatterVents(canvas, cavity, NEST_VENT_SPACING, NEST_VENTS);
     }
 
     static void guardians(RoomCanvas canvas) {
         RoomKit.entrance(canvas, 5);
         canvas.carve(RoomShape.box(3, F + 1, 5, 12, F + 6, 13));
         RoomKit.columns(canvas, GUARDIAN_PILLARS, F + 1, F + 6);
-        canvas.marker(7, F + 1, 9, new GuardianPostMarker(Optional.empty(), Optional.empty()));
+        RoomKit.post(canvas, 7, 9);
         canvas.marker(4, F + 1, 12, RoomKit.crates(NEST_LOOT));
         canvas.marker(11, F + 1, 12, RoomKit.crates(NEST_LOOT));
     }
@@ -114,6 +117,6 @@ final class FeatureRooms {
                 LabyrinthBlocks.bookshelf());
         canvas.fill(RoomShape.cylinder(RoomKit.MID, NEST_DEPTH, 2.0, F, F), LabyrinthBlocks.obsidianTile());
         canvas.marker(7, F + 1, 10, cache());
-        canvas.fill(RoomShape.box(6, F + 6, 9, 9, F + 6, 10), LabyrinthBlocks.glowingCrust());
+        canvas.fill(RoomShape.box(6, F + 7, 9, 9, F + 7, 10), LabyrinthBlocks.glowingCrust());
     }
 }

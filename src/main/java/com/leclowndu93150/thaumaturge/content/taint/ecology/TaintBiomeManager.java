@@ -1,6 +1,8 @@
 package com.leclowndu93150.thaumaturge.content.taint.ecology;
 
+import com.leclowndu93150.thaumaturge.api.taint.ITaintBlock;
 import com.leclowndu93150.thaumaturge.config.ThaumaturgeCommonConfig;
+import com.leclowndu93150.thaumaturge.content.world.space.LevelSpaces;
 import com.leclowndu93150.thaumaturge.data.worldgen.biome.TTBiomes;
 import com.leclowndu93150.thaumaturge.registry.TTAttachments;
 import com.leclowndu93150.thaumaturge.registry.TTBiomeTags;
@@ -28,6 +30,8 @@ import org.jspecify.annotations.Nullable;
 public final class TaintBiomeManager {
     private static final int QUARTS_PER_CHUNK = 4;
     private static final int CLEAN_SEARCH_RADIUS = 256;
+    private static final int CLEARED_SCAN_HEIGHT = 8;
+    private static final int BLOCKS_PER_QUART = 4;
 
     private TaintBiomeManager() {}
 
@@ -53,12 +57,12 @@ public final class TaintBiomeManager {
                 || TaintBlooms.isProtected(level, pos)) {
             return false;
         }
-        return replaceColumn(level, pos, TTBiomes.TAINTED_LANDS);
+        return LevelSpaces.isPlot(level, pos) || replaceColumn(level, pos, TTBiomes.TAINTED_LANDS);
     }
 
     public static boolean replaceColumn(ServerLevel level, BlockPos pos, ResourceKey<Biome> biomeKey) {
         LevelChunk chunk = loadedChunk(level, pos);
-        if (chunk == null) {
+        if (chunk == null || LevelSpaces.isPlot(level, pos)) {
             return false;
         }
         int quartX = QuartPos.fromBlock(pos.getX());
@@ -74,9 +78,31 @@ public final class TaintBiomeManager {
         return true;
     }
 
+    public static void restoreIfCleared(ServerLevel level, BlockPos pos) {
+        if (isChangedColumn(level, pos) && !hasTaintInColumn(level, pos)) {
+            restoreColumn(level, pos);
+        }
+    }
+
+    private static boolean hasTaintInColumn(ServerLevel level, BlockPos pos) {
+        int minX = QuartPos.toBlock(QuartPos.fromBlock(pos.getX()));
+        int minZ = QuartPos.toBlock(QuartPos.fromBlock(pos.getZ()));
+        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        for (int x = minX; x < minX + BLOCKS_PER_QUART; x++) {
+            for (int z = minZ; z < minZ + BLOCKS_PER_QUART; z++) {
+                for (int y = pos.getY() - CLEARED_SCAN_HEIGHT; y <= pos.getY() + CLEARED_SCAN_HEIGHT; y++) {
+                    if (level.getBlockState(probe.set(x, y, z)).getBlock() instanceof ITaintBlock) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public static boolean restoreColumn(ServerLevel level, BlockPos pos) {
         LevelChunk chunk = loadedChunk(level, pos);
-        if (chunk == null || !isTainted(level, pos)) {
+        if (chunk == null || LevelSpaces.isPlot(level, pos) || !isTainted(level, pos)) {
             return false;
         }
         int quartX = QuartPos.fromBlock(pos.getX());
@@ -103,6 +129,45 @@ public final class TaintBiomeManager {
         });
         setChanged(chunk, quartX, quartZ, false);
         return true;
+    }
+
+    public static boolean revertColumn(ServerLevel level, BlockPos pos, ResourceKey<Biome> painted) {
+        LevelChunk chunk = loadedChunk(level, pos);
+        if (chunk == null || LevelSpaces.isPlot(level, pos)) {
+            return false;
+        }
+        int quartX = QuartPos.fromBlock(pos.getX());
+        int quartZ = QuartPos.fromBlock(pos.getZ());
+        BiomeSnapshot snapshot = BiomeSnapshot.of(level, chunk);
+        BiomeSource source = level.getChunkSource().getGenerator().getBiomeSource();
+        Climate.Sampler sampler = level.getChunkSource().randomState().sampler();
+        if (!snapshot.columnHas(quartX, quartZ, biome -> biome.is(painted))
+                || !paintedOverGenerated(snapshot, source, sampler, quartX, quartZ, painted)) {
+            return false;
+        }
+        rewriteColumn(level, chunk, snapshot, quartX, quartZ, (x, y, z, ignored) -> {
+            Holder<Biome> current = snapshot.get(x, y, z);
+            return current.is(painted) ? source.getNoiseBiome(x, y, z, sampler) : current;
+        });
+        setChanged(chunk, quartX, quartZ, false);
+        return true;
+    }
+
+    private static boolean paintedOverGenerated(
+            BiomeSnapshot snapshot,
+            BiomeSource source,
+            Climate.Sampler sampler,
+            int quartX,
+            int quartZ,
+            ResourceKey<Biome> painted) {
+        for (int y = 0; y < snapshot.quartHeight(); y++) {
+            int quartY = snapshot.minQuartY() + y;
+            if (snapshot.get(quartX, quartY, quartZ).is(painted)
+                    && !source.getNoiseBiome(quartX, quartY, quartZ, sampler).is(painted)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isTaintedBiome(Holder<Biome> biome) {

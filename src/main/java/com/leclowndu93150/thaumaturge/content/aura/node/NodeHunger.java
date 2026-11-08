@@ -7,18 +7,20 @@ import com.leclowndu93150.thaumaturge.api.aspect.IAspect;
 import com.leclowndu93150.thaumaturge.api.nodes.NodeModifier;
 import com.leclowndu93150.thaumaturge.config.ThaumaturgeCommonConfig;
 import com.leclowndu93150.thaumaturge.content.aspect.EntityAspects;
-import com.leclowndu93150.thaumaturge.content.particle.BoreDebrisParticleOptions;
 import com.leclowndu93150.thaumaturge.content.wands.WandChargingEvents;
 import com.leclowndu93150.thaumaturge.content.warding.WardHandler;
+import com.leclowndu93150.thaumaturge.content.world.space.LevelSpaces;
+import com.leclowndu93150.thaumaturge.content.world.space.SpaceFrame;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -36,7 +38,6 @@ import org.jspecify.annotations.Nullable;
 
 final class NodeHunger {
     private static final int PULL_REFRESH_INTERVAL = 10;
-    private static final double GLOBAL_PULL_RANGE = 15.0;
     private static final double ITEM_RANGE_PADDING = 0.5;
     private static final double MINIMUM_PULL_DISTANCE = 1.0E-4;
     private static final float DEVOUR_DAMAGE = 1.0F;
@@ -44,10 +45,11 @@ final class NodeHunger {
     private static final int RANGE_AVERAGE_NUMERATOR = 2;
     private static final double SIDEWAYS_DRAG = 0.15;
     private static final double UPRIGHT_DRAG = 0.25;
-    private static final double MAW_RADIUS = 1.5;
+    private static final double MAW_RADIUS = 1.4;
     private static final float GROWTH_CAPACITY_WEIGHT = 2.0F;
     private static final int FRAGMENTS_PER_GLIMPSE = 3;
-    private static final double FRAGMENT_KICK = 0.03;
+    private static final double FRAGMENT_SPEED = 0.3;
+    private static final double FRAGMENT_LIFT = 0.05;
 
     private final BlockEntityNode node;
     private final List<Entity> pulled = new ArrayList<>();
@@ -58,12 +60,12 @@ final class NodeHunger {
     }
 
     static int eatRange(@Nullable NodeModifier modifier) {
-        int fixed = ThaumaturgeCommonConfig.HUNGRY_NODE_BLOCK_EAT_RANGE.get();
-        if (!ThaumaturgeCommonConfig.SCALE_HUNGRY_NODE_RANGE_BY_MODIFIER.get()) {
+        int fixed = ThaumaturgeCommonConfig.HUNGRY_NODE_EAT_RANGE.get();
+        if (!ThaumaturgeCommonConfig.SCALE_HUNGRY_NODE_EAT_RANGE_BY_MODIFIER.get()) {
             return fixed;
         }
-        int minimum = ThaumaturgeCommonConfig.HUNGRY_NODE_MINIMUM_BLOCK_EAT_RANGE.get();
-        int maximum = Math.max(minimum, ThaumaturgeCommonConfig.HUNGRY_NODE_MAXIMUM_BLOCK_EAT_RANGE.get());
+        int minimum = ThaumaturgeCommonConfig.HUNGRY_NODE_MINIMUM_EAT_RANGE.get();
+        int maximum = Math.max(minimum, ThaumaturgeCommonConfig.HUNGRY_NODE_MAXIMUM_EAT_RANGE.get());
         return scaledEatRange(minimum, maximum, modifier);
     }
 
@@ -86,62 +88,70 @@ final class NodeHunger {
     }
 
     private static boolean isPullable(Entity entity) {
-        return entity.isAlive() && !(entity instanceof Player player && (player.isCreative() || player.isSpectator()));
+        return !entity.isRemoved()
+                && !(entity instanceof Player player && (player.isCreative() || player.isSpectator()));
     }
 
     void tick(ServerLevel level, BlockPos pos, int counter) {
+        if (!ThaumaturgeCommonConfig.HUNGRY_NODE_EATS_ENTITIES.get()) {
+            pulled.clear();
+            return;
+        }
         if (cachedLevel != level) {
             pulled.clear();
             cachedLevel = level;
         }
-        Vec3 centre = Vec3.atCenterOf(pos);
-        double itemReach = eatRange(node.getNodeModifier()) + ITEM_RANGE_PADDING;
+        Vec3 centre = LevelSpaces.worldCenter(level, pos);
+        double entityReach = eatRange(node.getNodeModifier());
+        double itemReach = entityReach + ITEM_RANGE_PADDING;
         if (counter % PULL_REFRESH_INTERVAL == 0) {
-            gather(level, centre, Math.max(itemReach, GLOBAL_PULL_RANGE));
+            gather(level, pos, itemReach);
         }
         if (pulled.isEmpty()) {
             return;
         }
         for (Entity entity : pulled) {
-            if (!isPullable(entity) || entity.level() != level) {
+            if (!isPullable(entity)
+                    || entity.level() != level
+                    || !level.isPositionEntityTicking(entity.blockPosition())) {
                 continue;
             }
-            Vec3 toCentre = centre.subtract(entity.getBoundingBox().getCenter());
+            Vec3 toCentre = centre.subtract(entity.position());
             double distance = toCentre.length();
-            double reach = entity instanceof ItemEntity ? itemReach : GLOBAL_PULL_RANGE;
-            if (distance > MINIMUM_PULL_DISTANCE && distance < reach) {
-                drag(entity, toCentre, distance, reach);
+            double reach = entity instanceof ItemEntity ? itemReach : entityReach;
+            double closeness = 1.0 - distance / reach;
+            if (closeness <= 0.0) {
+                continue;
             }
-            if (shouldSwallow(distance)) {
+            if (distance > MINIMUM_PULL_DISTANCE
+                    && (!(entity instanceof Player) || ThaumaturgeCommonConfig.HUNGRY_NODE_PULLS_PLAYERS.get())) {
+                drag(entity, toCentre, distance, closeness);
+            }
+            if (shouldSwallow(distance)
+                    && (!(entity instanceof Player) || ThaumaturgeCommonConfig.HUNGRY_NODE_DAMAGES_PLAYERS.get())) {
                 swallow(level, entity);
             }
         }
     }
 
     static boolean shouldSwallow(double distance) {
-        return distance <= MAW_RADIUS;
+        return distance < MAW_RADIUS;
     }
 
-    private void gather(ServerLevel level, Vec3 centre, double reach) {
+    private void gather(ServerLevel level, BlockPos pos, double reach) {
         pulled.clear();
-        AABB area = AABB.ofSize(centre, reach * 2.0, reach * 2.0, reach * 2.0);
-        double reachSquared = reach * reach;
-        for (Entity entity : level.getEntitiesOfClass(Entity.class, area, NodeHunger::isPullable)) {
-            if (entity.getBoundingBox().getCenter().distanceToSqr(centre) <= reachSquared) {
-                pulled.add(entity);
-            }
-        }
+        pulled.addAll(level.getEntitiesOfClass(
+                Entity.class, LevelSpaces.worldBox(level, pos, new AABB(pos).inflate(reach)), NodeHunger::isPullable));
     }
 
-    private static void drag(Entity entity, Vec3 toCentre, double distance, double reach) {
-        double closeness = 1.0 - distance / reach;
+    private static void drag(Entity entity, Vec3 toCentre, double distance, double closeness) {
         double strength = closeness * closeness / distance;
-        entity.push(
+        entity.addDeltaMovement(new Vec3(
                 toCentre.x * SIDEWAYS_DRAG * strength,
                 toCentre.y * UPRIGHT_DRAG * strength,
-                toCentre.z * SIDEWAYS_DRAG * strength);
-        if (entity instanceof ServerPlayer player) {
-            player.connection.send(new ClientboundSetEntityMotionPacket(player));
+                toCentre.z * SIDEWAYS_DRAG * strength));
+        if (entity instanceof Player) {
+            entity.hurtMarked = true;
         }
     }
 
@@ -158,7 +168,7 @@ final class NodeHunger {
         if (entity instanceof ItemEntity item) {
             return AspectIndexAccess.of(item.getItem().copyWithCount(1));
         }
-        if (entity instanceof LivingEntity && !(entity instanceof Player)) {
+        if (entity instanceof LivingEntity) {
             return EntityAspects.of(entity);
         }
         return AspectList.EMPTY;
@@ -190,23 +200,27 @@ final class NodeHunger {
     static @Nullable BlockPos findTarget(
             Level level, BlockPos pos, @Nullable NodeModifier modifier, RandomSource random) {
         int reach = eatRange(modifier);
-        BlockPos aim = NodeScatter.around(pos, reach, random);
+        BlockPos aim = NodeScatter.triangular(pos, reach - 1, random);
+        SpaceFrame frame = LevelSpaces.frameOf(level, pos);
+        Vec3 to = frame.toWorld(Vec3.atCenterOf(aim));
         if (aim.equals(pos)
-                || !level.hasChunkAt(aim)
-                || aim.getY() >= level.getHeight(Heightmap.Types.WORLD_SURFACE, aim.getX(), aim.getZ())) {
+                || !level.hasChunkAt(BlockPos.containing(to))
+                || (frame.isWorld()
+                        && aim.getY() >= level.getHeight(Heightmap.Types.WORLD_SURFACE, aim.getX(), aim.getZ()))) {
             return null;
         }
         BlockHitResult hit = level.clip(new SourceIgnoringClipContext(
                 pos,
-                Vec3.atCenterOf(pos),
-                Vec3.atCenterOf(aim),
+                frame.toWorld(Vec3.atCenterOf(pos)),
+                to,
                 ClipContext.Block.OUTLINE,
                 ClipContext.Fluid.SOURCE_ONLY));
         if (hit.getType() != HitResult.Type.BLOCK) {
             return null;
         }
         BlockPos struck = hit.getBlockPos();
-        if (struck.distSqr(pos) > (double) reach * reach || WardHandler.isWarded(level, struck)) {
+        if (LevelSpaces.distanceSqr(level, struck, pos) > (double) reach * reach
+                || WardHandler.isWarded(level, struck)) {
             return null;
         }
         BlockState state = level.getBlockState(struck);
@@ -218,27 +232,28 @@ final class NodeHunger {
     }
 
     static void predict(Level level, BlockPos pos, @Nullable NodeModifier modifier) {
+        if (!ThaumaturgeCommonConfig.HUNGRY_NODE_EATS_BLOCKS.get()) {
+            return;
+        }
         RandomSource random = level.getRandom();
         BlockPos target = findTarget(level, pos, modifier, random);
         if (target == null) {
             return;
         }
-        Vec3 centre = Vec3.atCenterOf(pos);
-        BoreDebrisParticleOptions shard = new BoreDebrisParticleOptions(
-                level.getBlockState(target), centre.x, centre.y, centre.z, kick(random), kick(random), kick(random));
+        ParticleOptions shard = new BlockParticleOption(ParticleTypes.BLOCK, level.getBlockState(target));
+        Vec3 push = Vec3.atCenterOf(pos)
+                .subtract(Vec3.atCenterOf(target))
+                .normalize()
+                .scale(FRAGMENT_SPEED);
         for (int fragment = 0; fragment < FRAGMENTS_PER_GLIMPSE; fragment++) {
             level.addParticle(
                     shard,
                     target.getX() + random.nextDouble(),
                     target.getY() + random.nextDouble(),
                     target.getZ() + random.nextDouble(),
-                    0.0,
-                    0.0,
-                    0.0);
+                    push.x,
+                    push.y + FRAGMENT_LIFT,
+                    push.z);
         }
-    }
-
-    private static double kick(RandomSource random) {
-        return (random.nextDouble() * 2.0 - 1.0) * FRAGMENT_KICK;
     }
 }

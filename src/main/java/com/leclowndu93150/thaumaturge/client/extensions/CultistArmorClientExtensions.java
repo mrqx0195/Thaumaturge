@@ -7,6 +7,7 @@ import com.leclowndu93150.thaumaturge.client.model.gear.CrimsonBootsModel;
 import com.leclowndu93150.thaumaturge.client.model.gear.FortressArmorModel;
 import com.leclowndu93150.thaumaturge.client.model.gear.KnightArmorModel;
 import com.leclowndu93150.thaumaturge.client.model.gear.PraetorArmorModel;
+import com.leclowndu93150.thaumaturge.client.model.gear.RangerArmorModel;
 import com.leclowndu93150.thaumaturge.client.model.gear.RobeArmorModel;
 import com.leclowndu93150.thaumaturge.registry.TTItems;
 import java.util.function.Function;
@@ -18,7 +19,9 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.DyedItemColor;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -28,6 +31,7 @@ import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsE
 @EventBusSubscriber(modid = TTIds.MODID, value = Dist.CLIENT)
 public final class CultistArmorClientExtensions {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0);
+    private static final int UNDYED_HIDDEN = 0;
 
     private CultistArmorClientExtensions() {}
 
@@ -51,6 +55,23 @@ public final class CultistArmorClientExtensions {
                 TTItems.CRIMSON_PLATE_HELM.get(),
                 TTItems.CRIMSON_PLATE_CHEST.get(),
                 TTItems.CRIMSON_PLATE_LEGS.get());
+        event.registerItem(
+                new CustomArmorExtension(
+                        RangerArmorModel::new,
+                        TTModelLayers.RANGER_ARMOR_HEAD,
+                        TTModelLayers.RANGER_ARMOR_CHEST,
+                        TTModelLayers.RANGER_ARMOR_LEGS),
+                TTItems.CRIMSON_RANGER_HELM.get(),
+                TTItems.CRIMSON_RANGER_CHEST.get(),
+                TTItems.CRIMSON_RANGER_LEGS.get());
+        event.registerItem(
+                new CustomArmorExtension(
+                        RangerArmorModel::new,
+                        TTModelLayers.CAPTAIN_ARMOR_HEAD,
+                        TTModelLayers.CAPTAIN_ARMOR_CHEST,
+                        TTModelLayers.RANGER_ARMOR_LEGS),
+                TTItems.CRIMSON_CAPTAIN_HELM.get(),
+                TTItems.CRIMSON_CAPTAIN_CHEST.get());
         event.registerItem(
                 new CustomArmorExtension(
                         ClericArmorModel::new,
@@ -146,6 +167,16 @@ public final class CultistArmorClientExtensions {
             return robeDyeable
                     ? RobeArmorClientExtension.DEFAULT_DYE_COLOR
                     : IClientItemExtensions.super.getDefaultDyeColor(stack);
+        }
+
+        @Override
+        public int getArmorLayerTintColor(
+                ItemStack stack, LivingEntity entity, ArmorMaterial.Layer layer, int layerIdx, int fallbackColor) {
+            if (robeDyeable || !layer.dyeable()) {
+                return IClientItemExtensions.super.getArmorLayerTintColor(
+                        stack, entity, layer, layerIdx, fallbackColor);
+            }
+            return DyedItemColor.getOrDefault(stack, UNDYED_HIDDEN);
         }
 
         @Override

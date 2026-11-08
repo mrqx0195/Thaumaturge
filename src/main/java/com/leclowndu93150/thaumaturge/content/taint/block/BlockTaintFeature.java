@@ -5,6 +5,8 @@ import com.leclowndu93150.thaumaturge.api.taint.ITaintBlock;
 import com.leclowndu93150.thaumaturge.content.device.DeviceShapes;
 import com.leclowndu93150.thaumaturge.content.entity.EntityTaintCrawler;
 import com.leclowndu93150.thaumaturge.content.taint.TaintHelper;
+import com.leclowndu93150.thaumaturge.content.taint.ecology.TaintBiomeManager;
+import com.leclowndu93150.thaumaturge.content.taint.spread.TaintOrigins;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.leclowndu93150.thaumaturge.registry.TTEntities;
 import com.mojang.serialization.MapCodec;
@@ -77,9 +79,8 @@ public final class BlockTaintFeature extends DirectionalBlock implements ITaintB
     private static final int GEYSER_CHANCE = 100;
     private static final float CRAWLER_ON_BREAK_CHANCE = 0.333F;
     private static final float BREAK_POLLUTE_AMOUNT = 1.0F;
-    private static final int PASSIVE_POLLUTE_CHANCE = 200;
-    private static final float PASSIVE_POLLUTE_AMOUNT = 1.0F;
-    private static final float PASSIVE_POLLUTE_MAX_RATIO = 0.2F;
+    private static final double CELL_CENTRE = 0.5;
+    private static final float FULL_TURN_DEGREES = 360.0F;
 
     public BlockTaintFeature(Properties properties) {
         super(properties);
@@ -115,18 +116,10 @@ public final class BlockTaintFeature extends DirectionalBlock implements ITaintB
 
     @Override
     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        TaintHelper.trySpreadTaintedBiome(level, pos, random);
-        boolean sustained = TaintHelper.isEcologicallySustained(level, pos);
-        if (!sustained && random.nextInt(DIE_CHANCE) == 0) {
+        if (!TaintOrigins.isSustained(level, pos) && random.nextInt(DIE_CHANCE) == 0) {
             decay(level, pos, state);
+            TaintBiomeManager.restoreIfCleared(level, pos);
             return;
-        }
-        if (sustained && random.nextInt(PASSIVE_POLLUTE_CHANCE) == 0) {
-            int auraBase = AuraHelper.getAuraBase(level, pos);
-            if (auraBase > 0 && AuraHelper.getFlux(level, pos) <= auraBase * PASSIVE_POLLUTE_MAX_RATIO) {
-                AuraHelper.polluteAura(level, pos, PASSIVE_POLLUTE_AMOUNT, true);
-                return;
-            }
         }
         TaintHelper.attemptFibreGrowth(level, pos, false);
         BlockState below = level.getBlockState(pos.below());
@@ -142,24 +135,25 @@ public final class BlockTaintFeature extends DirectionalBlock implements ITaintB
     protected void onRemove(BlockState state, Level world, BlockPos pos, BlockState next, boolean movedByPiston) {
         super.onRemove(state, world, pos, next, movedByPiston);
         if (state.is(next.getBlock()) || !(world instanceof ServerLevel level)) return;
-        if (level.getRandom().nextFloat() < CRAWLER_ON_BREAK_CHANCE) {
-            EntityTaintCrawler crawler = TTEntities.TAINT_CRAWLER.get().create(level);
-            if (crawler != null) {
-                crawler.moveTo(
-                        pos.getX() + 0.5,
-                        pos.getY() + 0.5,
-                        pos.getZ() + 0.5,
-                        level.getRandom().nextInt(360),
-                        0.0F);
-                level.addFreshEntity(crawler);
-            }
-        } else {
+        RandomSource random = level.getRandom();
+        EntityTaintCrawler crawler = random.nextFloat() < CRAWLER_ON_BREAK_CHANCE
+                ? TTEntities.TAINT_CRAWLER.get().create(level)
+                : null;
+        if (crawler == null) {
             AuraHelper.polluteAura(level, pos, BREAK_POLLUTE_AMOUNT, true);
+            return;
         }
+        crawler.moveTo(
+                pos.getX() + CELL_CENTRE,
+                pos.getY(),
+                pos.getZ() + CELL_CENTRE,
+                random.nextFloat() * FULL_TURN_DEGREES,
+                0.0F);
+        level.addFreshEntity(crawler);
     }
 
     @Override
     public void decay(Level level, BlockPos pos, BlockState state) {
-        level.setBlock(pos, TTBlocks.FLUX_GOO.get().defaultBlockState(), Block.UPDATE_ALL);
+        level.removeBlock(pos, false);
     }
 }

@@ -54,6 +54,16 @@
         "amount": 1
       }
     ],
+    "#thaumaturge:scan/dynamic_tree_branches": [
+      {
+        "aspect": "thaumaturge:herba",
+        "amount": 20
+      },
+      {
+        "aspect": "thaumaturge:victus",
+        "amount": 5
+      }
+    ],
     "#c:concrete_powders": [
       {
         "aspect": "thaumaturge:terra",
@@ -397,27 +407,23 @@
     "#c:nuggets/copper": [
       {
         "aspect": "thaumaturge:metallum",
-        "amount": 2
-      },
-      {
-        "aspect": "thaumaturge:permutatio",
         "amount": 1
       }
     ],
     "#c:nuggets/gold": [
       {
         "aspect": "thaumaturge:metallum",
-        "amount": 2
+        "amount": 1
       },
       {
         "aspect": "thaumaturge:desiderium",
-        "amount": 2
+        "amount": 1
       }
     ],
     "#c:nuggets/iron": [
       {
         "aspect": "thaumaturge:metallum",
-        "amount": 2
+        "amount": 1
       }
     ],
     "#c:obsidians/crying": [
@@ -2296,6 +2302,16 @@
       {
         "aspect": "thaumaturge:ordo",
         "amount": 2
+      }
+    ],
+    "minecraft:cobblestone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 1
       }
     ],
     "minecraft:dispenser": [
@@ -5768,6 +5784,34 @@
         "amount": 5
       }
     ],
+    "thaumaturge:obsidian_tile": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ignis",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:tenebrae",
+        "amount": 5
+      }
+    ],
+    "thaumaturge:obsidian_totem": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ignis",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:tenebrae",
+        "amount": 5
+      }
+    ],
     "thaumaturge:log_greatwood": [
       {
         "aspect": "thaumaturge:herba",
@@ -5790,16 +5834,8 @@
     ],
     "thaumaturge:nugget_quicksilver": [
       {
-        "aspect": "thaumaturge:terra",
-        "amount": 5
-      },
-      {
-        "aspect": "thaumaturge:ordo",
-        "amount": 5
-      },
-      {
         "aspect": "thaumaturge:metallum",
-        "amount": 5
+        "amount": 1
       }
     ],
     "thaumaturge:ore_amber": [
@@ -6269,6 +6305,246 @@
       },
       {
         "aspect": "thaumaturge:cognitio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:polished_andesite": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:smooth_red_sandstone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:chiseled_deepslate": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:tenebrae",
+        "amount": 2
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:polished_deepslate": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:tenebrae",
+        "amount": 2
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:cut_red_sandstone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:smooth_sandstone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:deepslate_bricks": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:tenebrae",
+        "amount": 2
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:chiseled_quartz_block": [
+      {
+        "aspect": "thaumaturge:vitreus",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:chiseled_red_sandstone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:deepslate_tiles": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:tenebrae",
+        "amount": 2
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:polished_granite": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:stone_bricks": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:smooth_stone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:quartz_pillar": [
+      {
+        "aspect": "thaumaturge:vitreus",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:smooth_quartz": [
+      {
+        "aspect": "thaumaturge:vitreus",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:chiseled_sandstone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:chiseled_stone_bricks": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:cut_sandstone": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:perditio",
+        "amount": 15
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 15
+      }
+    ],
+    "minecraft:polished_diorite": [
+      {
+        "aspect": "thaumaturge:terra",
+        "amount": 5
+      },
+      {
+        "aspect": "thaumaturge:ordo",
+        "amount": 5
+      }
+    ],
+    "minecraft:quartz_bricks": [
+      {
+        "aspect": "thaumaturge:vitreus",
         "amount": 15
       },
       {

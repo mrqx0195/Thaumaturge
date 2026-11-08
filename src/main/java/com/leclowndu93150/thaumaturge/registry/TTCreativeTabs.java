@@ -117,10 +117,12 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.ESSENTIA_INPUT.get());
                         output.accept(TTItems.ESSENTIA_OUTPUT.get());
                         output.accept(TTItems.BUCKET_LIQUID_DEATH.get());
+                        output.accept(TTItems.BUCKET_FLUX_GOO.get());
                         output.accept(TTItems.BUCKET_PURIFYING.get());
                         output.accept(TTItems.JAR_BRACE.get());
                         output.accept(TTItems.JAR_NORMAL.get());
                         output.accept(TTItems.JAR_VOID.get());
+                        output.accept(TTItems.JAR_CREATIVE.get());
                         output.accept(TTItems.JAR_BRAIN.get());
                         output.accept(TTItems.JAR_NODE.get());
                         output.accept(TTItems.TUBE.get());
@@ -300,6 +302,8 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.THAUMIUM_CHEST.get());
                         output.accept(TTItems.THAUMIUM_LEGS.get());
                         output.accept(TTItems.THAUMIUM_BOOTS.get());
+                        output.accept(TTItems.THAUMIUM_SHIELD.get());
+                        output.accept(TTItems.MIRROR_SHIELD.get());
                         output.accept(TTItems.VOID_SWORD.get());
                         output.accept(TTItems.VOID_PICKAXE.get());
                         output.accept(TTItems.VOID_AXE.get());
@@ -309,6 +313,7 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.VOID_CHEST.get());
                         output.accept(TTItems.VOID_LEGS.get());
                         output.accept(TTItems.VOID_BOOTS.get());
+                        output.accept(TTItems.VOID_SHIELD.get());
                         ItemStack elementalSword = new ItemStack(TTItems.ELEMENTAL_SWORD.get());
                         InfusionEnchantmentHelper.add(elementalSword, InfusionEnchantment.ARCING, 2);
                         output.accept(elementalSword);
@@ -451,6 +456,7 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.TAINTED_GOO.get());
                         output.accept(TTItems.TAINT_TENDRIL.get());
                         output.accept(TTItems.BOTTLE_TAINT.get());
+                        output.accept(TTItems.TAINTED_EGG.get());
                         output.accept(TTItems.TAINT_ROCK.get());
                         output.accept(TTItems.TAINT_SOIL.get());
                         output.accept(TTItems.TAINT_CRUST.get());
@@ -468,6 +474,11 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.CRIMSON_PLATE_HELM.get());
                         output.accept(TTItems.CRIMSON_PLATE_CHEST.get());
                         output.accept(TTItems.CRIMSON_PLATE_LEGS.get());
+                        output.accept(TTItems.CRIMSON_RANGER_HELM.get());
+                        output.accept(TTItems.CRIMSON_RANGER_CHEST.get());
+                        output.accept(TTItems.CRIMSON_RANGER_LEGS.get());
+                        output.accept(TTItems.CRIMSON_CAPTAIN_HELM.get());
+                        output.accept(TTItems.CRIMSON_CAPTAIN_CHEST.get());
                         output.accept(TTItems.CRIMSON_BOOTS.get());
                         output.accept(TTItems.CRIMSON_ROBE_HELM.get());
                         output.accept(TTItems.CRIMSON_ROBE_CHEST.get());
@@ -512,6 +523,8 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.LOOT_BAG_COMMON.get());
                         output.accept(TTItems.LOOT_BAG_UNCOMMON.get());
                         output.accept(TTItems.LOOT_BAG_RARE.get());
+                        output.accept(TTItems.ARCANE_ARMOR_TRIM_SMITHING_TEMPLATE.get());
+                        output.accept(TTItems.OCCULT_ARMOR_TRIM_SMITHING_TEMPLATE.get());
                         output.accept(TTItems.LOOT_URN_COMMON.get());
                         output.accept(TTItems.LOOT_URN_UNCOMMON.get());
                         output.accept(TTItems.LOOT_URN_RARE.get());
@@ -524,6 +537,8 @@ public final class TTCreativeTabs {
                         output.accept(TTItems.ELDRITCH_GUARDIAN_SPAWN_EGG.get());
                         output.accept(TTItems.CULTIST_KNIGHT_SPAWN_EGG.get());
                         output.accept(TTItems.CULTIST_CLERIC_SPAWN_EGG.get());
+                        output.accept(TTItems.CULTIST_RANGER_SPAWN_EGG.get());
+                        output.accept(TTItems.CULTIST_RANGER_CAPTAIN_SPAWN_EGG.get());
                         output.accept(TTItems.CULTIST_PORTAL_LESSER_SPAWN_EGG.get());
                         output.accept(TTItems.CULTIST_LEADER_SPAWN_EGG.get());
                         output.accept(TTItems.CULTIST_PORTAL_GREATER_SPAWN_EGG.get());

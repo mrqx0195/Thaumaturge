@@ -23,7 +23,7 @@ import com.leclowndu93150.thaumaturge.api.taint.TaintApi;
 import com.leclowndu93150.thaumaturge.api.wands.WandAccess;
 import com.leclowndu93150.thaumaturge.api.warp.WarpHelper;
 import com.leclowndu93150.thaumaturge.compat.curio.ThaumaturgeCuriosCompat;
-import com.leclowndu93150.thaumaturge.config.TaintConfigMigration;
+import com.leclowndu93150.thaumaturge.compat.sable.SableLevelSpaces;
 import com.leclowndu93150.thaumaturge.config.ThaumaturgeClientConfig;
 import com.leclowndu93150.thaumaturge.config.ThaumaturgeCommonConfig;
 import com.leclowndu93150.thaumaturge.config.ThaumaturgeServerConfig;
@@ -48,6 +48,7 @@ import com.leclowndu93150.thaumaturge.content.wands.WandAccessBindings;
 import com.leclowndu93150.thaumaturge.content.warp.WarpManager;
 import com.leclowndu93150.thaumaturge.content.workbench.ArcaneCraftingTransactions;
 import com.leclowndu93150.thaumaturge.content.workbench.WorkbenchPayment;
+import com.leclowndu93150.thaumaturge.content.world.space.LevelSpaces;
 import com.leclowndu93150.thaumaturge.registry.*;
 import com.leclowndu93150.thaumaturge.registry.TTIngredientTypes;
 import com.leclowndu93150.thaumaturge.registry.TTInstabilityEffects;
@@ -62,7 +63,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +117,6 @@ public final class Thaumaturge {
 
         LegacyRegistryAliases.register(modBus);
 
-        TaintConfigMigration.migrate(FMLPaths.CONFIGDIR.get().resolve(TTIds.MODID + "-common.toml"));
         container.registerConfig(ModConfig.Type.COMMON, ThaumaturgeCommonConfig.SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, ThaumaturgeClientConfig.SPEC);
         container.registerConfig(ModConfig.Type.SERVER, ThaumaturgeServerConfig.SPEC);
@@ -146,5 +145,6 @@ public final class Thaumaturge {
 
         LabyrinthHelper.bind(new LabyrinthBindings());
         if (ModList.get().isLoaded(TTIds.CURIOS)) ThaumaturgeCuriosCompat.init(modBus);
+        if (ModList.get().isLoaded(TTIds.SABLE)) LevelSpaces.install(new SableLevelSpaces());
     }
 }

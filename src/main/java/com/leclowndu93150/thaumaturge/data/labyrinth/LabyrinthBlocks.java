@@ -16,7 +16,12 @@ public final class LabyrinthBlocks {
     private LabyrinthBlocks() {}
 
     public static List<Block> passableBlocks() {
-        return List.of(TTBlocks.ELDRITCH_DOOR.get(), TTBlocks.ELDRITCH_LOCK.get());
+        return List.of(
+                TTBlocks.ELDRITCH_DOOR.get(),
+                TTBlocks.ELDRITCH_LOCK.get(),
+                TTBlocks.STAIRS_ELDRITCH.get(),
+                TTBlocks.STAIRS_ELDRITCH_TILE.get(),
+                TTBlocks.STAIRS_ELDRITCH_ROCK.get());
     }
 
     static boolean passable(BlockState state) {
@@ -71,16 +76,16 @@ public final class LabyrinthBlocks {
         return TTBlocks.ELDRITCH_CRAB_SPAWNER.get().defaultBlockState();
     }
 
+    static BlockState pedestal() {
+        return TTBlocks.ELDRITCH_PEDESTAL.get().defaultBlockState();
+    }
+
     static BlockState capstone() {
         return TTBlocks.ELDRITCH_CAPSTONE.get().defaultBlockState();
     }
 
     static BlockState obelisk() {
         return TTBlocks.ELDRITCH_OBELISK.get().defaultBlockState();
-    }
-
-    static BlockState pillar() {
-        return TTBlocks.ELDRITCH_PILLAR.get().defaultBlockState();
     }
 
     static BlockState column(Direction.Axis axis) {
@@ -98,7 +103,15 @@ public final class LabyrinthBlocks {
     static boolean roundingHost(BlockState state) {
         return state.is(TTBlocks.ELDRITCH_STONE.get())
                 || state.is(TTBlocks.ELDRITCH_STONE_INERT.get())
-                || state.is(TTBlocks.ELDRITCH_ROCK.get());
+                || state.is(TTBlocks.ELDRITCH_ROCK.get())
+                || state.is(TTBlocks.ELDRITCH_CRUST_GLOWING.get());
+    }
+
+    static boolean roundingFloor(BlockState state) {
+        return roundingHost(state)
+                || state.is(TTBlocks.STONE_ELDRITCH_TILE.get())
+                || state.is(TTBlocks.OBSIDIAN_TILE.get())
+                || state.is(TTBlocks.ELDRITCH_CRUST.get());
     }
 
     static BlockState rockStairs(Direction facing) {

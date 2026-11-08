@@ -55,6 +55,8 @@ public final class TTMaterials {
             20,
             () -> Ingredient.of(TTItemTags.INGOTS_VOID_METAL));
 
+    private static final String CLOTH_SUFFIX = "_cloth";
+
     public static final int DURABILITY_THAUMIUM = 25;
     public static final int DURABILITY_ROBES = 25;
     public static final int DURABILITY_TRAVELLER = 25;
@@ -62,6 +64,8 @@ public final class TTMaterials {
     public static final int DURABILITY_VOID_ROBE = 18;
     public static final int DURABILITY_FORTRESS = 40;
     public static final int DURABILITY_CULTIST_PLATE = 18;
+    public static final int DURABILITY_CULTIST_RANGER = 18;
+    public static final int DURABILITY_CULTIST_CAPTAIN = 18;
     public static final int DURABILITY_CULTIST_ROBE = 17;
     public static final int DURABILITY_CULTIST_BOOTS = 15;
     public static final int DURABILITY_CULTIST_LEADER = 30;
@@ -139,7 +143,7 @@ public final class TTMaterials {
             0.0F,
             0.0F,
             () -> Ingredient.of(Tags.Items.INGOTS_IRON),
-            false);
+            clothLayers("cultist_plate"));
     public static final Holder<ArmorMaterial> ARMOR_CULTIST_ROBE = register(
             "cultist_robe",
             defense(2, 4, 5, 2),
@@ -148,7 +152,7 @@ public final class TTMaterials {
             0.0F,
             0.0F,
             () -> Ingredient.of(ItemTags.WOOL),
-            false);
+            clothLayers("cultist_robe"));
     public static final Holder<ArmorMaterial> ARMOR_CULTIST_BOOTS = register(
             "cultist_boots",
             defense(2, 5, 6, 2),
@@ -158,6 +162,24 @@ public final class TTMaterials {
             0.0F,
             () -> Ingredient.of(Tags.Items.INGOTS_IRON),
             false);
+    public static final Holder<ArmorMaterial> ARMOR_CULTIST_RANGER = register(
+            "cultist_ranger",
+            defense(2, 5, 6, 2),
+            13,
+            SoundEvents.ARMOR_EQUIP_CHAIN,
+            0.0F,
+            0.0F,
+            () -> Ingredient.of(Tags.Items.INGOTS_IRON),
+            clothLayers("cultist_ranger"));
+    public static final Holder<ArmorMaterial> ARMOR_CULTIST_CAPTAIN = register(
+            "cultist_captain",
+            defense(2, 5, 6, 2),
+            13,
+            SoundEvents.ARMOR_EQUIP_CHAIN,
+            0.0F,
+            0.0F,
+            () -> Ingredient.of(Tags.Items.INGOTS_IRON),
+            clothLayers("cultist_captain"));
     public static final Holder<ArmorMaterial> ARMOR_CULTIST_LEADER = register(
             "cultist_leader",
             defense(3, 6, 7, 3),
@@ -166,7 +188,7 @@ public final class TTMaterials {
             1.0F,
             0.0F,
             () -> Ingredient.of(Tags.Items.INGOTS_IRON),
-            false);
+            clothLayers("cultist_leader"));
 
     public static final Holder<ArmorMaterial> ARMOR_THAUMOSTATIC_HARNESS = register(
             "thaumostatic_harness",
@@ -215,6 +237,11 @@ public final class TTMaterials {
                         layers,
                         toughness,
                         knockbackResistance));
+    }
+
+    private static List<ArmorMaterial.Layer> clothLayers(String name) {
+        return List.of(
+                new ArmorMaterial.Layer(TTIds.rl(name)), new ArmorMaterial.Layer(TTIds.rl(name), CLOTH_SUFFIX, true));
     }
 
     private static Map<ArmorItem.Type, Integer> defense(int boots, int leggings, int chestplate, int helmet) {

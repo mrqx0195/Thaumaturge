@@ -74,6 +74,7 @@ class NodeHungerPortTest {
         when(chunks.getChunkNow(anyInt(), anyInt())).thenReturn(mock(LevelChunk.class));
         when(level.getRandom()).thenReturn(random);
         when(level.getBlockState(any(BlockPos.class))).thenReturn(Blocks.AIR.defaultBlockState());
+        when(level.isPositionEntityTicking(any())).thenReturn(true);
         return level;
     }
 
@@ -84,6 +85,8 @@ class NodeHungerPortTest {
     }
 
     private static void setCenter(Entity entity, Vec3 center) {
+        when(entity.position()).thenReturn(center);
+        when(entity.blockPosition()).thenReturn(BlockPos.containing(center));
         when(entity.getBoundingBox())
                 .thenReturn(new AABB(
                         center.x - 0.25,
@@ -115,13 +118,13 @@ class NodeHungerPortTest {
         Entity entity = mock(Entity.class);
         when(entity.isAlive()).thenReturn(true);
         when(entity.level()).thenReturn(level);
-        setCenter(entity, new Vec3(1.95, 0.5, 0.5));
+        setCenter(entity, new Vec3(1.85, 0.5, 0.5));
         when(level.getEntitiesOfClass(eq(Entity.class), any(AABB.class), any())).thenReturn(List.of(entity));
 
         hunger.tick(level, BlockPos.ZERO, 10);
 
         verify(entity).hurt(damageSource, 1.0F);
-        verify(entity).push(anyDouble(), anyDouble(), anyDouble());
+        verify(entity).addDeltaMovement(any(Vec3.class));
     }
 
     @Test
@@ -184,7 +187,7 @@ class NodeHungerPortTest {
         hunger.tick(firstLevel, BlockPos.ZERO, 10);
         hunger.tick(secondLevel, BlockPos.ZERO, 11);
 
-        verify(entity, times(1)).push(anyDouble(), anyDouble(), anyDouble());
+        verify(entity, times(1)).addDeltaMovement(any(Vec3.class));
         verify(secondLevel, never()).getEntitiesOfClass(eq(Entity.class), any(AABB.class), any());
     }
 
@@ -271,26 +274,29 @@ class NodeHungerPortTest {
 
         hunger.tick(level, BlockPos.ZERO, 10);
 
-        verify(entity, never()).push(anyDouble(), anyDouble(), anyDouble());
+        verify(entity, never()).addDeltaMovement(any(Vec3.class));
         verify(entity, never()).hurt(any(DamageSource.class), anyFloat());
     }
 
     @Test
-    void playerCanBePulledButDoesNotFeedAspectEssenceToTheNode() throws Exception {
+    void playerFeedsItsEntityEssenceToTheNode() throws Exception {
         NodeHunger hunger = new NodeHunger(node());
         Player player = mock(Player.class);
+        AspectList essence = AspectList.EMPTY.add(Holder.direct(mock(IAspect.class)), 1);
         Method method = NodeHunger.class.getDeclaredMethod("essenceOf", Entity.class);
         method.setAccessible(true);
+        try (MockedStatic<EntityAspects> entityAspects = mockStatic(EntityAspects.class)) {
+            entityAspects.when(() -> EntityAspects.of(player)).thenReturn(essence);
 
-        assertEquals(AspectList.EMPTY, method.invoke(hunger, player));
+            assertEquals(essence, method.invoke(hunger, player));
+        }
     }
 
     @Test
     void blockTargetSamplingDoesNotInspectOrLoadAnUnloadedChunk() {
         Level level = mock(Level.class);
         RandomSource random = mock(RandomSource.class);
-        when(random.nextFloat()).thenReturn(0.5F);
-        when(random.nextBoolean()).thenReturn(true);
+        when(random.nextInt(anyInt())).thenReturn(1, 0, 0, 0, 0, 0);
         when(level.hasChunkAt(any(BlockPos.class))).thenReturn(false);
 
         assertNull(NodeHunger.findTarget(level, BlockPos.ZERO, null, random));

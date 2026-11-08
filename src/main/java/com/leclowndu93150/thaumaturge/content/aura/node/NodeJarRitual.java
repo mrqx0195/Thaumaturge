@@ -11,6 +11,7 @@ import com.leclowndu93150.thaumaturge.content.recipe.dust.DustTriggerFx;
 import com.leclowndu93150.thaumaturge.content.recipe.dust.DustTriggerSwapQueue;
 import com.leclowndu93150.thaumaturge.content.wands.WandEconomy;
 import com.leclowndu93150.thaumaturge.content.wands.WandVisHelper;
+import com.leclowndu93150.thaumaturge.content.world.space.LevelSpaces;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.leclowndu93150.thaumaturge.registry.TTSounds;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ public final class NodeJarRitual {
         if (node.isJarring()) {
             return true;
         }
-        if (!PlayerResearchAccess.of(player).knows(RESEARCH_NODE_JAR)) {
+        if (!PlayerResearchAccess.of(player).hasCompleted(RESEARCH_NODE_JAR)) {
             TTActionBar.sendPurple(player, "message.thaumaturge.node_jar.no_research");
             return true;
         }
@@ -79,7 +80,7 @@ public final class NodeJarRitual {
         }
         int lastBreak = 0;
         for (BlockPos structurePos : structure) {
-            double dist = Math.sqrt(hand.distanceToSqr(Vec3.atCenterOf(structurePos)));
+            double dist = Math.sqrt(LevelSpaces.distanceSqr(level, hand, Vec3.atCenterOf(structurePos)));
             int delay = (int) (dist * DustTriggerFx.SPARKLE_TICKS_PER_BLOCK) + SHELL_BREAK_MARGIN_TICKS;
             DustTriggerSwapQueue.enqueueClear(level, structurePos, level.getBlockState(structurePos), delay);
             lastBreak = Math.max(lastBreak, delay);
@@ -102,13 +103,13 @@ public final class NodeJarRitual {
         }
         NodeData data = new NodeData(
                 node.getNodeType(), Optional.ofNullable(modifier), node.getAspects(), node.getAspectsBase());
-        level.removeBlockEntity(nodePos);
         level.setBlock(nodePos, TTBlocks.JAR_NODE.get().defaultBlockState(), Block.UPDATE_ALL);
         if (level.getBlockEntity(nodePos) instanceof BlockEntityJarNode jar) {
             jar.applyNodeData(data);
             jar.setChanged();
-            level.sendBlockUpdated(nodePos, jar.getBlockState(), jar.getBlockState(), Block.UPDATE_ALL);
         }
+        BlockState current = level.getBlockState(nodePos);
+        level.sendBlockUpdated(nodePos, current, current, Block.UPDATE_ALL);
         Effects.bamf(level, nodePos).withSound().fancy().send();
     }
 

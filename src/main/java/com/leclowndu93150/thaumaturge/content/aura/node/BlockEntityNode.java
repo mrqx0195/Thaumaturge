@@ -10,12 +10,15 @@ import com.leclowndu93150.thaumaturge.api.aura.AuraHelper;
 import com.leclowndu93150.thaumaturge.api.aura.IVisRelaySource;
 import com.leclowndu93150.thaumaturge.api.nodes.NodeModifier;
 import com.leclowndu93150.thaumaturge.api.nodes.NodeType;
+import com.leclowndu93150.thaumaturge.api.taint.ITaintOrigin;
 import com.leclowndu93150.thaumaturge.api.transaction.TransactionContext;
 import com.leclowndu93150.thaumaturge.config.ThaumaturgeCommonConfig;
 import com.leclowndu93150.thaumaturge.content.blockentity.AbstractSyncedBlockEntity;
 import com.leclowndu93150.thaumaturge.content.effect.Effects;
+import com.leclowndu93150.thaumaturge.content.taint.spread.TaintOrigins;
 import com.leclowndu93150.thaumaturge.content.wands.EntityAspectOrb;
 import com.leclowndu93150.thaumaturge.content.wands.WandChargingEvents;
+import com.leclowndu93150.thaumaturge.content.world.space.LevelSpaces;
 import com.leclowndu93150.thaumaturge.data.worldgen.biome.TTBiomes;
 import com.leclowndu93150.thaumaturge.registry.TTBlockEntities;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
@@ -44,7 +47,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
-public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspectContainer {
+public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspectContainer, ITaintOrigin {
     private static final int REGEN_INTERVAL_NORMAL = 600;
     private static final int REGEN_INTERVAL_BRIGHT = 400;
     private static final int REGEN_INTERVAL_PALE = 900;
@@ -52,14 +55,13 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     private static final int STARVATION_DRIFT_THRESHOLD = 10;
     private static final int DECAY_INTERVAL = 1200;
     private static final int DISCHARGE_RANGE = 4;
-    private static final int BEHAVIOR_INTERVAL = 50;
+    static final int BEHAVIOR_INTERVAL = 50;
     private static final int STABILITY_INTERVAL = 100;
     private static final float FLUX_TAINT_THRESHOLD = 0.5F;
     private static final int FLUX_TAINT_CHANCE = 20;
     private static final float BRIGHTEN_FLUX_LIMIT = 0.1F;
     private static final float BRIGHTEN_FILL_FRACTION = 0.9F;
     private static final int BRIGHTEN_CHANCE = 50;
-    private static final double HUNGRY_PULL_RANGE = 15.0;
     private static final int ORB_BURST_MAX_PER_ASPECT = 10;
     private static final int ORB_BURST_MAX_ORBS_PER_ASPECT = 20;
     private static final float ZAP_WIDTH = 0.3F;
@@ -68,9 +70,10 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     private static final int LOCK_BASIC_REGEN_FACTOR = 2;
     private static final int LOCK_ADVANCED_REGEN_FACTOR = 20;
     private static final int UNSTABLE_CURE_ROLL = 10000;
-    private static final int UNSTABLE_CURE_MAGIC = 42;
     private static final int FADING_CURE_ROLL = 12500;
-    private static final int FADING_CURE_MAGIC = 69;
+    private static final int DECAY_REMOVAL_ODDS = 20;
+    private static final int DECAY_MODIFIER_ODDS = 5;
+    private static final int DECAY_FADE_ODDS = 5;
     private static final int MAX_DECOMPOSE_DEPTH = 8;
 
     private final NodeHunger hunger = new NodeHunger(this);
@@ -90,7 +93,8 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     private int drainColor = 0xFFFFFF;
     private int drainTicks;
     private int jarringTicks;
-    private boolean naturalTaintBootstrapPending;
+    private float taintReserve;
+    int taintPurifyTicks;
     public int clientDrainRed = 255;
     public int clientDrainGreen = 255;
     public int clientDrainBlue = 255;
@@ -114,10 +118,13 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     }
 
     public void applyNodeData(NodeData data) {
-        setNodeType(data.type());
-        setNodeModifier(data.modifier().orElse(null));
-        this.aspects = data.aspects();
-        this.aspectsBase = data.aspectsBase();
+        nodeType = data.type();
+        nodeModifier = data.modifier().orElse(null);
+        aspects = data.aspects();
+        aspectsBase = data.aspectsBase();
+        refreshIndex();
+        regeneration = -1;
+        changed();
     }
 
     public NodeType getNodeType() {
@@ -125,24 +132,52 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     }
 
     public void setNodeType(NodeType type) {
+        NodeType previous = this.nodeType;
         this.nodeType = type;
-        if (level instanceof ServerLevel serverLevel && isNodeBlock()) {
-            NodeLocationIndex.get(serverLevel).register(worldPosition, type);
+        if (previous != type && level instanceof ServerLevel serverLevel) {
+            NodeBiomeSpread.revertPainted(serverLevel, worldPosition, previous);
         }
-    }
-
-    /** Marks a world-generated tainted node for its one-time pollution hotspot bootstrap. */
-    public void markNaturalTaintBootstrap() {
-        naturalTaintBootstrapPending = true;
-        setChanged();
+        if (type != NodeType.TAINTED) {
+            taintReserve = 0.0F;
+            taintPurifyTicks = 0;
+        }
+        refreshIndex();
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
-        if (level instanceof ServerLevel serverLevel && isNodeBlock()) {
+        refreshIndex();
+    }
+
+    private void refreshIndex() {
+        if (!(level instanceof ServerLevel serverLevel) || !isNodeBlock()) {
+            return;
+        }
+        if (!LevelSpaces.isPlot(serverLevel, worldPosition)) {
             NodeLocationIndex.get(serverLevel).register(worldPosition, nodeType);
         }
+        if (nodeType == NodeType.TAINTED) {
+            TaintOrigins.register(serverLevel, worldPosition);
+        } else {
+            TaintOrigins.unregister(serverLevel, worldPosition);
+        }
+    }
+
+    @Override
+    public boolean isLiveTaintOrigin() {
+        return nodeType == NodeType.TAINTED && allowTypeBehavior() && !isRemoved();
+    }
+
+    @Override
+    public float getTaintReserve() {
+        return taintReserve;
+    }
+
+    @Override
+    public void setTaintReserve(float reserve) {
+        taintReserve = Math.max(0.0F, reserve);
+        setChanged();
     }
 
     void removeDepleted(ServerLevel serverLevel, BlockPos pos) {
@@ -205,10 +240,6 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         return aspectsBase;
     }
 
-    public int getNodeVisBase(Holder<IAspect> aspect) {
-        return aspectsBase.amountOf(aspect);
-    }
-
     @Override
     public int fill(Holder<IAspect> aspect, int amount) {
         int capped = Math.min(amount, Math.max(0, aspectsBase.amountOf(aspect) - aspects.amountOf(aspect)));
@@ -224,8 +255,10 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         if (aspects.amountOf(aspect) < amount) {
             return false;
         }
-        aspects = reduce(aspects, aspect, amount);
-        syncContents();
+        if (amount > 0) {
+            aspects = reduce(aspects, aspect, amount);
+            syncContents();
+        }
         return true;
     }
 
@@ -270,13 +303,15 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     }
 
     public void setEnergized(boolean energized) {
-        if (energized && !this.energized) {
+        if (energized == this.energized) {
+            return;
+        }
+        centivis.clear();
+        if (energized) {
             aspectsBaseOriginal = aspectsBase;
             aspectsBase = decomposeToPrimals(aspectsBase);
-            // Transducers consume the live store while charging; conversion restores the node's original capacity
-            // as primal vis rather than preserving only that depleted charging remainder.
             aspects = aspectsBase;
-        } else if (!energized && this.energized && aspectsBaseOriginal != null) {
+        } else if (aspectsBaseOriginal != null) {
             aspectsBase = aspectsBaseOriginal;
             aspectsBaseOriginal = null;
         }
@@ -356,7 +391,6 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         if (!(tickLevel instanceof ServerLevel serverLevel)) {
             return;
         }
-        applyNaturalTaintBootstrap(serverLevel, pos);
         if (energized) {
             boolean changed = false;
             if (NodeEnergy.refillDue(serverLevel) && NodeEnergy.refill(this, serverLevel, pos)) {
@@ -489,12 +523,13 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
                 && random.nextInt(FLUX_TAINT_CHANCE) == 0) {
             setNodeType(NodeType.TAINTED);
             nodeChange();
-            return;
         }
         boolean healthy = flux < base * BRIGHTEN_FLUX_LIMIT
                 && AuraHelper.getVis(serverLevel, pos) >= base * BRIGHTEN_FILL_FRACTION
-                && serverLevel.getBiome(pos).is(TTBiomes.MAGICAL_FOREST);
-        if (healthy && random.nextInt(BRIGHTEN_CHANCE) == 0) {
+                && serverLevel
+                        .getBiome(LevelSpaces.worldBlock(serverLevel, pos))
+                        .is(TTBiomes.MAGICAL_FOREST);
+        if (healthy && random.nextInt(BRIGHTEN_CHANCE) == 0 && nodeModifier != NodeModifier.BRIGHT) {
             if (nodeModifier == NodeModifier.FADING) {
                 nodeModifier = NodeModifier.PALE;
             } else if (nodeModifier == NodeModifier.PALE) {
@@ -514,20 +549,20 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         for (AspectInstance entry : aspectsBase.entries()) {
             if (aspects.amountOf(entry.aspect()) <= 0) {
                 int remaining = entry.amount() - 1;
-                if (remaining > 0 && random.nextInt(20) != 0) {
+                if (remaining > 0 && random.nextInt(DECAY_REMOVAL_ODDS) != 0) {
                     aspectsBase = reduce(aspectsBase, entry.aspect(), 1);
                 } else {
                     aspects = reduce(aspects, entry.aspect(), aspects.amountOf(entry.aspect()));
                     aspectsBase = reduce(aspectsBase, entry.aspect(), remaining + 1);
-                    if (random.nextInt(5) == 0) {
+                    if (random.nextInt(DECAY_MODIFIER_ODDS) == 0) {
                         if (nodeModifier == NodeModifier.BRIGHT) {
                             nodeModifier = null;
                         } else if (nodeModifier == null) {
                             nodeModifier = NodeModifier.PALE;
                         }
-                        if (nodeModifier == NodeModifier.PALE && random.nextInt(5) == 0) {
-                            nodeModifier = NodeModifier.FADING;
-                        }
+                    }
+                    if (nodeModifier == NodeModifier.PALE && random.nextInt(DECAY_FADE_ODDS) == 0) {
+                        nodeModifier = NodeModifier.FADING;
                     }
                 }
                 nodeChange();
@@ -549,10 +584,6 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
             return LOCK_ADVANCED_REGEN_FACTOR;
         }
         return 1;
-    }
-
-    public int getLock() {
-        return lock;
     }
 
     private static boolean isGenerated(ServerLevel level, BlockPos pos) {
@@ -580,8 +611,7 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         }
         int oldLock = lock;
         int nextLock = 0;
-        if (allowLock()
-                && !serverLevel.hasNeighborSignal(below)
+        if (!serverLevel.hasNeighborSignal(below)
                 && serverLevel.getBlockState(below).getBlock() instanceof BlockNodeStabilizer stabilizer) {
             nextLock = stabilizer.isAdvanced() ? LOCK_ADVANCED : LOCK_BASIC;
         }
@@ -592,10 +622,6 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
     }
 
     protected boolean allowDischarge() {
-        return true;
-    }
-
-    protected boolean allowLock() {
         return true;
     }
 
@@ -616,7 +642,7 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         if (nodeModifier == NodeModifier.PALE && random.nextBoolean()) {
             return change;
         }
-        BlockPos otherPos = NodeScatter.around(pos, DISCHARGE_RANGE, random);
+        BlockPos otherPos = NodeScatter.triangular(pos, DISCHARGE_RANGE, random);
         if (otherPos.equals(pos)) {
             return change;
         }
@@ -686,27 +712,27 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
             return change;
         }
         RandomSource random = serverLevel.getRandom();
-        if (nodeType == NodeType.UNSTABLE && random.nextBoolean()) {
+        if (nodeType == NodeType.UNSTABLE) {
             if (lock == 0) {
-                Holder<IAspect> primal = randomStoredPrimal(random);
-                if (primal != null && drain(primal, 1)) {
-                    ResourceKey<IAspect> key = primal.unwrapKey().orElseThrow();
-                    serverLevel.addFreshEntity(new EntityAspectOrb(
-                            serverLevel, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, key, 1));
-                    return true;
+                if (random.nextBoolean()) {
+                    Holder<IAspect> primal = randomStoredPrimal(random);
+                    if (primal != null && drain(primal, 1)) {
+                        ResourceKey<IAspect> key = primal.unwrapKey().orElseThrow();
+                        serverLevel.addFreshEntity(new EntityAspectOrb(
+                                serverLevel, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, key, 1));
+                        change = true;
+                    }
                 }
-            } else if (random.nextInt(UNSTABLE_CURE_ROLL / lock) == UNSTABLE_CURE_MAGIC) {
+            } else if (random.nextBoolean() && random.nextInt(UNSTABLE_CURE_ROLL / lock) == 0) {
                 setNodeType(NodeType.NORMAL);
                 nodeChange();
-                return true;
+                change = true;
             }
         }
-        if (nodeModifier == NodeModifier.FADING
-                && lock > 0
-                && random.nextInt(FADING_CURE_ROLL / lock) == FADING_CURE_MAGIC) {
+        if (nodeModifier == NodeModifier.FADING && lock > 0 && random.nextInt(FADING_CURE_ROLL / lock) == 0) {
             nodeModifier = NodeModifier.PALE;
             nodeChange();
-            return true;
+            change = true;
         }
         return change;
     }
@@ -729,7 +755,7 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         RandomSource random = serverLevel.getRandom();
         if (nodeType == NodeType.HUNGRY) {
             hunger.tick(serverLevel, pos, count);
-            if (NodeHunger.eatDue(count)) {
+            if (ThaumaturgeCommonConfig.HUNGRY_NODE_EATS_BLOCKS.get() && NodeHunger.eatDue(count)) {
                 eatBlock(serverLevel, pos, random);
             }
             return false;
@@ -855,18 +881,6 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         NodeHunger.predict(clientLevel, pos, nodeModifier);
     }
 
-    private void applyNaturalTaintBootstrap(ServerLevel level, BlockPos pos) {
-        if (!naturalTaintBootstrapPending) {
-            return;
-        }
-        naturalTaintBootstrapPending = false;
-        setChanged();
-        if (nodeType != NodeType.TAINTED || ThaumaturgeCommonConfig.WUSS_MODE.get()) {
-            return;
-        }
-        NodeBootstrap.run(level, pos);
-    }
-
     @Override
     protected void saveAdditional(CompoundTag output, HolderLookup.Provider registries) {
         super.saveAdditional(output, registries);
@@ -889,8 +903,11 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
         if (jarringTicks > 0) {
             output.putInt("Jarring", jarringTicks);
         }
-        if (naturalTaintBootstrapPending) {
-            output.putBoolean("NaturalTaintBootstrap", true);
+        if (taintReserve > 0.0F) {
+            output.putFloat("TaintReserve", taintReserve);
+        }
+        if (taintPurifyTicks > 0) {
+            output.putInt("TaintPurify", taintPurifyTicks);
         }
     }
 
@@ -910,7 +927,8 @@ public class BlockEntityNode extends AbstractSyncedBlockEntity implements IAspec
                 TTNbt.read(input, "DrainPlayer", UUIDUtil.CODEC, registries).orElse(null);
         drainColor = input.contains("DrainColor") ? input.getInt("DrainColor") : 0xFFFFFF;
         jarringTicks = input.getInt("Jarring");
-        naturalTaintBootstrapPending = input.getBoolean("NaturalTaintBootstrap");
+        taintReserve = Math.max(0.0F, input.getFloat("TaintReserve"));
+        taintPurifyTicks = input.getInt("TaintPurify");
         regeneration = -1;
     }
 }

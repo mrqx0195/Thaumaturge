@@ -30,6 +30,8 @@ public final class TTBlockTags {
     public static final TagKey<Block> STORAGE_BLOCKS_THAUMIUM = common("storage_blocks/thaumium");
     public static final TagKey<Block> STORAGE_BLOCKS_VOID_METAL = common("storage_blocks/void_metal");
     public static final TagKey<Block> STORAGE_BLOCKS_AMBER = common("storage_blocks/amber");
+    public static final TagKey<Block> STORAGE_BLOCKS_FLESH = common("storage_blocks/flesh");
+    public static final TagKey<Block> STORAGE_BLOCKS_TALLOW = common("storage_blocks/tallow");
 
     public static final TagKey<Block> INFUSION_STABILISERS = key("infusion_stabilisers");
 
@@ -50,12 +52,25 @@ public final class TTBlockTags {
     public static final TagKey<Block> TAINT_CONVERTIBLE_ROCK = key("taint_convertible/rock");
     public static final TagKey<Block> TAINT_CONVERTIBLE_CRUST = key("taint_convertible/crust");
     public static final TagKey<Block> TAINT_CONVERSION_IMMUNE = key("taint_conversion_immune");
+    public static final TagKey<Block> TAINT_BLOCKS = key("taint_blocks");
 
     public static final TagKey<Block> CINDERPEARL_SOIL = key("cinderpearl_soil");
     public static final TagKey<Block> SHIMMERLEAF_SOIL = key("shimmerleaf_soil");
     public static final TagKey<Block> VISHROOM_SOIL = key("vishroom_soil");
 
     public static final TagKey<Block> CONNECTED_ELDRITCH_STONE = key("connected/eldritch_stone");
+
+    public static final TagKey<Block> DT_BRANCHES_THAT_BURN = dynamicTrees("branches_that_burn");
+    public static final TagKey<Block> DT_STRIPPED_BRANCHES_THAT_BURN = dynamicTrees("stripped_branches_that_burn");
+    public static final TagKey<Block> DT_LEAVES = dynamicTrees("leaves");
+    public static final TagKey<Block> DT_SAPLINGS = dynamicTrees("saplings");
+
+    public static final TagKey<Block> SABLE_SUPER_HEAVY = sable("super_heavy");
+    public static final TagKey<Block> SABLE_HEAVY = sable("heavy");
+    public static final TagKey<Block> SABLE_LIGHT = sable("light");
+    public static final TagKey<Block> SABLE_SUPER_LIGHT = sable("super_light");
+    public static final TagKey<Block> SABLE_HALF_VOLUME = sable("half_volume");
+    public static final TagKey<Block> SABLE_QUARTER_VOLUME = sable("quarter_volume");
 
     private TTBlockTags() {}
 
@@ -65,5 +80,13 @@ public final class TTBlockTags {
 
     private static TagKey<Block> common(String path) {
         return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", path));
+    }
+
+    private static TagKey<Block> sable(String path) {
+        return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(TTIds.SABLE, path));
+    }
+
+    private static TagKey<Block> dynamicTrees(String path) {
+        return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(TTIds.DYNAMIC_TREES, path));
     }
 }

@@ -30,6 +30,7 @@ import com.leclowndu93150.thaumaturge.content.taint.block.BlockTaintSporeStalk;
 import com.leclowndu93150.thaumaturge.data.model.crystal.CrystalBlockstateGenerator;
 import com.leclowndu93150.thaumaturge.data.model.crystal.CrystalItemModelGenerator;
 import com.leclowndu93150.thaumaturge.data.model.crystal.EssentiaCrystalModelGenerator;
+import com.leclowndu93150.thaumaturge.data.trim.TTTrimBootstrap;
 import com.leclowndu93150.thaumaturge.registry.TTBlockTags;
 import com.leclowndu93150.thaumaturge.registry.TTBlocks;
 import com.leclowndu93150.thaumaturge.registry.TTItems;
@@ -45,12 +46,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.models.BlockModelGenerators;
+import net.minecraft.data.models.ItemModelGenerators;
 import net.minecraft.data.models.blockstates.BlockStateGenerator;
 import net.minecraft.data.models.blockstates.Condition;
 import net.minecraft.data.models.blockstates.MultiPartGenerator;
@@ -65,6 +68,7 @@ import net.minecraft.data.models.model.ModelTemplates;
 import net.minecraft.data.models.model.TextureMapping;
 import net.minecraft.data.models.model.TextureSlot;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
@@ -111,6 +115,9 @@ public final class TTModelProvider implements DataProvider {
     private static final ResourceLocation PROPERTY_CELESTIAL_BODY = TTIds.rl("celestial_body");
     private static final ResourceLocation PROPERTY_WAND_IS_STAFF = TTIds.rl("wand_is_staff");
     private static final ResourceLocation PROPERTY_DAMAGE = ResourceLocation.withDefaultNamespace("damage");
+    private static final List<ItemModelGenerators.TrimModelData> TRIM_MODELS = Stream.concat(
+                    TTTrimBootstrap.MATERIAL_MODELS.stream(), ItemModelGenerators.GENERATED_TRIM_MODELS.stream())
+            .toList();
 
     private final PackOutput.PathProvider blockStatePath;
     private final PackOutput.PathProvider modelPath;
@@ -194,6 +201,7 @@ public final class TTModelProvider implements DataProvider {
         registerInvisibleBlock(TTBlocks.NODE.get());
         registerJar(TTBlocks.JAR_NORMAL.get(), "jar_normal");
         registerJar(TTBlocks.JAR_VOID.get(), "jar_void");
+        registerJar(TTBlocks.JAR_CREATIVE.get(), "jar_normal");
         registerJarBrain();
         registerAuraDevices(blockModels);
         registerNoiseDevices();
@@ -323,6 +331,7 @@ public final class TTModelProvider implements DataProvider {
         flatItem(TTItems.TAINTED_GOO.get());
         flatItem(TTItems.TAINT_TENDRIL.get());
         flatItem(TTItems.BOTTLE_TAINT.get());
+        flatItem(TTItems.TAINTED_EGG.get());
         flatItem(TTItems.VIS_RESONATOR.get());
         flatItem(TTItems.THAUMIC_SLIME_SPAWN_EGG.get());
         flatItem(TTItems.TAINT_CRAWLER_SPAWN_EGG.get());
@@ -344,6 +353,8 @@ public final class TTModelProvider implements DataProvider {
         flatItem(TTItems.ELDRITCH_GUARDIAN_SPAWN_EGG.get());
         flatItem(TTItems.CULTIST_KNIGHT_SPAWN_EGG.get());
         flatItem(TTItems.CULTIST_CLERIC_SPAWN_EGG.get());
+        flatItem(TTItems.CULTIST_RANGER_SPAWN_EGG.get());
+        flatItem(TTItems.CULTIST_RANGER_CAPTAIN_SPAWN_EGG.get());
         flatItem(TTItems.CULTIST_PORTAL_LESSER_SPAWN_EGG.get());
         flatItem(TTItems.CULTIST_LEADER_SPAWN_EGG.get());
         flatItem(TTItems.CULTIST_PORTAL_GREATER_SPAWN_EGG.get());
@@ -356,12 +367,17 @@ public final class TTModelProvider implements DataProvider {
         handheldItem(TTItems.PECH_WAND.get());
         handheldItem(TTItems.CRIMSON_BLADE.get());
         flatItem(TTItems.CRIMSON_PLATE_HELM.get());
-        flatItem(TTItems.CRIMSON_PLATE_CHEST.get());
-        flatItem(TTItems.CRIMSON_PLATE_LEGS.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_PLATE_CHEST.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_PLATE_LEGS.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_RANGER_HELM.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_RANGER_CHEST.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_RANGER_LEGS.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_CAPTAIN_HELM.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_CAPTAIN_CHEST.get());
         flatItem(TTItems.CRIMSON_BOOTS.get());
-        flatItem(TTItems.CRIMSON_ROBE_HELM.get());
-        flatItem(TTItems.CRIMSON_ROBE_CHEST.get());
-        flatItem(TTItems.CRIMSON_ROBE_LEGS.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_ROBE_HELM.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_ROBE_CHEST.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_ROBE_LEGS.get());
         flatItem(TTItems.TUBE.get());
         flatItem(TTItems.TUBE_VALVE.get());
         flatItem(TTItems.TUBE_RESTRICT.get());
@@ -439,17 +455,19 @@ public final class TTModelProvider implements DataProvider {
         handheldItem(TTItems.PRIMAL_CRUSHER.get());
         flatItem(TTItems.THAUMOSTATIC_HARNESS.get());
         flatItem(TTItems.TRAVELLER_BOOTS.get());
-        flatItem(TTItems.THAUMIUM_HELM.get());
-        flatItem(TTItems.THAUMIUM_CHEST.get());
-        flatItem(TTItems.THAUMIUM_LEGS.get());
-        flatItem(TTItems.THAUMIUM_BOOTS.get());
-        flatItem(TTItems.VOID_HELM.get());
-        flatItem(TTItems.VOID_CHEST.get());
-        flatItem(TTItems.VOID_LEGS.get());
-        flatItem(TTItems.VOID_BOOTS.get());
-        registerRobeItem(TTItems.CLOTH_CHEST.get(), "cloth_chest");
-        registerRobeItem(TTItems.CLOTH_LEGS.get(), "cloth_legs");
-        registerRobeItem(TTItems.CLOTH_BOOTS.get(), "cloth_boots");
+        registerTrimmableArmor(TTItems.THAUMIUM_HELM.get(), ArmorItem.Type.HELMET);
+        registerTrimmableArmor(TTItems.THAUMIUM_CHEST.get(), ArmorItem.Type.CHESTPLATE);
+        registerTrimmableArmor(TTItems.THAUMIUM_LEGS.get(), ArmorItem.Type.LEGGINGS);
+        registerTrimmableArmor(TTItems.THAUMIUM_BOOTS.get(), ArmorItem.Type.BOOTS);
+        registerTrimmableArmor(TTItems.VOID_HELM.get(), ArmorItem.Type.HELMET);
+        registerTrimmableArmor(TTItems.VOID_CHEST.get(), ArmorItem.Type.CHESTPLATE);
+        registerTrimmableArmor(TTItems.VOID_LEGS.get(), ArmorItem.Type.LEGGINGS);
+        registerTrimmableArmor(TTItems.VOID_BOOTS.get(), ArmorItem.Type.BOOTS);
+        registerRobeItem(TTItems.CLOTH_CHEST.get(), "cloth_chest", ArmorItem.Type.CHESTPLATE);
+        registerRobeItem(TTItems.CLOTH_LEGS.get(), "cloth_legs", ArmorItem.Type.LEGGINGS);
+        registerRobeItem(TTItems.CLOTH_BOOTS.get(), "cloth_boots", ArmorItem.Type.BOOTS);
+        flatItem(TTItems.ARCANE_ARMOR_TRIM_SMITHING_TEMPLATE.get());
+        flatItem(TTItems.OCCULT_ARMOR_TRIM_SMITHING_TEMPLATE.get());
         registerSpa();
         registerCasters();
         registerGolemancy();
@@ -538,40 +556,24 @@ public final class TTModelProvider implements DataProvider {
 
     private void registerManaPod() {
         Block pod = TTBlocks.MANA_POD.get();
-        ResourceLocation[] stems = new ResourceLocation[3];
-        ResourceLocation[][] dynamicTreeStems = new ResourceLocation[5][3];
-        int[] dynamicTreeLifts = {0, 4, 5, 6, 8};
-        for (int i = 0; i < 3; i++) {
-            TextureMapping texture = TextureMapping.cross(TextureMapping.getBlockTexture(pod, "_stem_" + i));
-            stems[i] = ModelTemplates.CROSS.createWithSuffix(
-                    pod,
-                    "_stage" + i,
-                    texture,
-                    (id, json) -> modelOutput.accept(id, () -> {
-                        JsonElement element = json.get();
-                        element.getAsJsonObject().addProperty("render_type", "minecraft:cutout");
-                        return element;
-                    }));
-            for (int lift = 1; lift < dynamicTreeLifts.length; lift++) {
-                int pixels = dynamicTreeLifts[lift];
-                dynamicTreeStems[lift][i] = ModelTemplates.CROSS.createWithSuffix(
-                        pod,
-                        "_stage" + i + "_dynamic_tree_" + pixels,
-                        texture,
-                        (id, json) -> modelOutput.accept(id, () -> {
-                            JsonObject model = raisedCrossModel(json.get().getAsJsonObject(), pixels);
-                            model.addProperty("render_type", "minecraft:cutout");
-                            return model;
-                        }));
+        ResourceLocation baseModel = ModelLocationUtils.getModelLocation(pod);
+        ResourceLocation[][] models = new ResourceLocation[3][BlockManaPod.DYNAMIC_TREE_LIFT_PIXELS.size()];
+        for (int stage = 0; stage < 3; stage++) {
+            int modelStage = stage;
+            for (int lift = 0; lift < BlockManaPod.DYNAMIC_TREE_LIFT_PIXELS.size(); lift++) {
+                int pixels = BlockManaPod.DYNAMIC_TREE_LIFT_PIXELS.get(lift);
+                String suffix = "_stage" + stage + (lift == 0 ? "" : "_dynamic_tree_" + pixels);
+                models[stage][lift] = baseModel.withSuffix(suffix);
+                modelOutput.accept(models[stage][lift], () -> manaPodModel(modelStage, pixels));
             }
         }
         PropertyDispatch.C2<Integer, Integer> ages =
                 PropertyDispatch.properties(BlockManaPod.AGE, BlockManaPod.DYNAMIC_TREE_LIFT);
         for (int age = 0; age <= 7; age++) {
             int stage = Math.min(age, 2);
-            ages.select(age, 0, v(stems[stage]));
-            for (int lift = 1; lift < dynamicTreeLifts.length; lift++) {
-                ages.select(age, lift, v(dynamicTreeStems[lift][stage]));
+            ages.select(age, 0, v(models[stage][0]));
+            for (int lift = 1; lift < BlockManaPod.DYNAMIC_TREE_LIFT_PIXELS.size(); lift++) {
+                ages.select(age, lift, v(models[stage][lift]));
             }
         }
         blockStateOutput.accept(MultiVariantGenerator.multiVariant(pod).with(ages));
@@ -582,48 +584,148 @@ public final class TTModelProvider implements DataProvider {
                 modelOutput);
     }
 
-    private static JsonObject raisedCrossModel(JsonObject template, int pixels) {
+    private static JsonObject manaPodModel(int stage, int stemLift) {
         JsonObject model = new JsonObject();
         model.addProperty("parent", BLOCK_PARENT.toString());
-        model.add("textures", template.getAsJsonObject("textures"));
+        model.addProperty("render_type", "minecraft:cutout");
+        JsonObject textures = new JsonObject();
+        textures.addProperty("particle", "thaumaturge:block/mana_pod_stem");
+        textures.addProperty("stem", "thaumaturge:block/mana_pod_stem");
+        textures.addProperty("bean", "thaumaturge:block/mana_pod_bean");
+        model.add("textures", textures);
+
         JsonArray elements = new JsonArray();
-        elements.add(crossPlane(0, pixels, 8, 16, pixels + 16, 8, "north", "south"));
-        elements.add(crossPlane(8, pixels, 0, 8, pixels + 16, 16, "west", "east"));
+        if (stage < 2) {
+            elements.add(manaPodPlane(
+                    5,
+                    10 + stemLift,
+                    8,
+                    11,
+                    16 + stemLift,
+                    8,
+                    "north",
+                    "south",
+                    new float[] {16, 16, 23, 23},
+                    new float[] {stage == 0 ? 16 : 24, 16, stage == 0 ? 23 : 32, 23}));
+            elements.add(manaPodPlane(
+                    8,
+                    10 + stemLift,
+                    5,
+                    8,
+                    16 + stemLift,
+                    11,
+                    "west",
+                    "east",
+                    new float[] {stage == 0 ? 16 : 24, 16, stage == 0 ? 23 : 31, 23},
+                    new float[] {stage == 0 ? 16 : 24, 16, stage == 0 ? 23 : 32, 23}));
+        } else {
+            elements.add(manaPodPlane(
+                    0,
+                    10 + stemLift,
+                    8,
+                    16,
+                    16 + stemLift,
+                    8,
+                    "north",
+                    "south",
+                    new float[] {0, 16, 16, 24},
+                    new float[] {0, 16, 16, 24}));
+            elements.add(manaPodPlane(
+                    8,
+                    10 + stemLift,
+                    0,
+                    8,
+                    16 + stemLift,
+                    16,
+                    "west",
+                    "east",
+                    new float[] {0, 16, 16, 24},
+                    new float[] {0, 16, 16, 24}));
+        }
+        if (stage == 0) {
+            elements.add(manaPodBox(7, 12 + stemLift, 7, 9, 14 + stemLift, 9, 8, 4, 12, 8, 8, 0, 12, 4));
+        } else if (stage == 1) {
+            elements.add(manaPodBox(6, 6 + stemLift, 6, 10, 10 + stemLift, 10, 8, 4, 12, 8, 8, 0, 12, 4));
+        } else if (stage == 2) {
+            elements.add(manaPodBox(4, 3.2F + stemLift, 4, 12, 11.2F + stemLift, 12, 0, 8, 8, 16, 0, 0, 8, 8));
+            elements.add(manaPodBox(5, 2.2F + stemLift, 5, 11, 4.2F + stemLift, 11, 0, 14, 8, 16, 1, 1, 7, 7));
+            elements.add(manaPodBox(5, 10.2F + stemLift, 5, 11, 12.2F + stemLift, 11, 0, 8, 8, 10, 1, 1, 7, 7));
+        }
         model.add("elements", elements);
         return model;
     }
 
-    private static JsonObject crossPlane(
-            int fromX, int fromY, int fromZ, int toX, int toY, int toZ, String faceA, String faceB) {
+    private static JsonObject manaPodPlane(
+            float fromX,
+            float fromY,
+            float fromZ,
+            float toX,
+            float toY,
+            float toZ,
+            String faceA,
+            String faceB,
+            float[] uvA,
+            float[] uvB) {
         JsonObject plane = new JsonObject();
-        plane.add("from", vector(fromX, fromY, fromZ));
-        plane.add("to", vector(toX, toY, toZ));
+        plane.add("from", coords(fromX, fromY, fromZ));
+        plane.add("to", coords(toX, toY, toZ));
         plane.addProperty("shade", false);
         JsonObject faces = new JsonObject();
-        faces.add(faceA, crossFace());
-        faces.add(faceB, crossFace());
+        faces.add(faceA, manaPodFace("#stem", uvA[0], uvA[1], uvA[2], uvA[3], false));
+        faces.add(faceB, manaPodFace("#stem", uvB[0], uvB[1], uvB[2], uvB[3], false));
         plane.add("faces", faces);
         return plane;
     }
 
-    private static JsonObject crossFace() {
+    private static JsonObject manaPodBox(
+            float fromX,
+            float fromY,
+            float fromZ,
+            float toX,
+            float toY,
+            float toZ,
+            float sideU1,
+            float sideV1,
+            float sideU2,
+            float sideV2,
+            float capU1,
+            float capV1,
+            float capU2,
+            float capV2) {
+        JsonObject box = new JsonObject();
+        box.add("from", coords(fromX, fromY, fromZ));
+        box.add("to", coords(toX, toY, toZ));
+        JsonObject faces = new JsonObject();
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            faces.add(direction.getSerializedName(), manaPodFace("#bean", sideU1, sideV1, sideU2, sideV2, true));
+        }
+        faces.add("up", manaPodFace("#bean", capU1, capV1, capU2, capV2, true));
+        faces.add("down", manaPodFace("#bean", capU1, capV1, capU2, capV2, true));
+        box.add("faces", faces);
+        return box;
+    }
+
+    private static JsonObject manaPodFace(String texture, float u1, float v1, float u2, float v2, boolean tint) {
         JsonObject face = new JsonObject();
         JsonArray uv = new JsonArray();
-        uv.add(0);
-        uv.add(0);
-        uv.add(16);
-        uv.add(16);
+        uv.add(u1 / 2);
+        uv.add(v1 / 2);
+        uv.add(u2 / 2);
+        uv.add(v2 / 2);
         face.add("uv", uv);
-        face.addProperty("texture", "#cross");
+        face.addProperty("texture", texture);
+        if (tint) {
+            face.addProperty("tintindex", 0);
+        }
         return face;
     }
 
-    private static JsonArray vector(int x, int y, int z) {
-        JsonArray vector = new JsonArray();
-        vector.add(x);
-        vector.add(y);
-        vector.add(z);
-        return vector;
+    private static JsonArray coords(float x, float y, float z) {
+        JsonArray array = new JsonArray();
+        array.add(x);
+        array.add(y);
+        array.add(z);
+        return array;
     }
 
     private static Variant v(ResourceLocation model) {
@@ -971,8 +1073,8 @@ public final class TTModelProvider implements DataProvider {
         registerMirrorItem(TTItems.MIRROR.get(), "mirrorframe");
         registerMirrorItem(TTItems.MIRROR_ESSENTIA.get(), "mirrorframe2");
         flatItem(TTItems.CRIMSON_PRAETOR_HELM.get());
-        flatItem(TTItems.CRIMSON_PRAETOR_CHEST.get());
-        flatItem(TTItems.CRIMSON_PRAETOR_LEGS.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_PRAETOR_CHEST.get());
+        registerDyeableCrimsonArmor(TTItems.CRIMSON_PRAETOR_LEGS.get());
         flatItem(TTItems.FORTRESS_HELM.get());
         flatItem(TTItems.FORTRESS_CHEST.get());
         flatItem(TTItems.FORTRESS_LEGS.get());
@@ -1164,41 +1266,25 @@ public final class TTModelProvider implements DataProvider {
                             };
                         })));
         modelOutput.accept(
-                ModelLocationUtils.getModelLocation(block.asItem()),
-                () -> new Gson()
-                        .toJsonTree(Map.of(
-                                "parent",
-                                "minecraft:block/block",
-                                "loader",
-                                "neoforge:composite",
-                                "children",
-                                Map.of(
-                                        "main",
-                                                Map.of(
-                                                        "parent",
-                                                        "thaumaturge:block/research_table_main",
-                                                        "transform",
-                                                        Map.of(
-                                                                "origin",
-                                                                "corner",
-                                                                "translation",
-                                                                List.of(0.25F, 0.25F, 0.5F),
-                                                                "scale",
-                                                                0.5F)),
-                                        "ext",
-                                                Map.of(
-                                                        "parent",
-                                                        "thaumaturge:block/research_table_ext",
-                                                        "transform",
-                                                        Map.of(
-                                                                "origin",
-                                                                "corner",
-                                                                "translation",
-                                                                List.of(0.75F, 0.25F, 0.5F),
-                                                                "rotation",
-                                                                List.of(0.0F, -180.0F, 0.0F),
-                                                                "scale",
-                                                                0.5F))))));
+                ModelLocationUtils.getModelLocation(block.asItem()), TTModelProvider::researchTableItemModel);
+    }
+
+    private static JsonObject researchTableItemModel() {
+        JsonObject model = new JsonObject();
+        model.addProperty("parent", "minecraft:builtin/entity");
+        model.addProperty("gui_light", "side");
+        JsonObject textures = new JsonObject();
+        textures.addProperty("particle", "thaumaturge:block/plank_greatwood");
+        model.add("textures", textures);
+        JsonObject display = new JsonObject();
+        display.add("gui", displayTransform(30, 225, 0, 0, 0, 0, 0.625F));
+        display.add("ground", displayTransform(0, 0, 0, 0, 3, 0, 0.25F));
+        display.add("fixed", displayTransform(0, 0, 0, 0, 0, 0, 0.5F));
+        display.add("thirdperson_righthand", displayTransform(75, 45, 0, 0, 2.5F, 0, 0.375F));
+        display.add("firstperson_righthand", displayTransform(0, 45, 0, 0, 0, 0, 0.4F));
+        display.add("firstperson_lefthand", displayTransform(0, 225, 0, 0, 0, 0, 0.4F));
+        model.add("display", display);
+        return model;
     }
 
     private void registerInvisibleBlock(Block block) {
@@ -1264,6 +1350,7 @@ public final class TTModelProvider implements DataProvider {
         simpleBlock(TTBlocks.PURIFYING_FLUID.get(), TTIds.rl("block/purifying_fluid"));
         simpleBlock(TTBlocks.LIQUID_DEATH.get(), TTIds.rl("block/liquid_death"));
         flatItem(TTItems.BUCKET_LIQUID_DEATH.get());
+        flatItem(TTItems.BUCKET_FLUX_GOO.get());
         flatItem(TTItems.BUCKET_PURIFYING.get());
     }
 
@@ -1418,11 +1505,43 @@ public final class TTModelProvider implements DataProvider {
         flatItem(TTItems.FOCUS_3.get());
     }
 
-    private void registerRobeItem(Item item, String name) {
+    private void registerRobeItem(Item item, String name, ArmorItem.Type type) {
+        trimmableItem(item, List.of(TTIds.rl("item/" + name), TTIds.rl("item/" + name + "_over")), type);
+    }
+
+    private void registerDyeableCrimsonArmor(Item item) {
         ModelTemplates.TWO_LAYERED_ITEM.create(
-                TTIds.rl("item/" + name),
-                TextureMapping.layered(TTIds.rl("item/" + name), TTIds.rl("item/" + name + "_over")),
+                ModelLocationUtils.getModelLocation(item),
+                TextureMapping.layered(
+                        TextureMapping.getItemTexture(item), TextureMapping.getItemTexture(item, "_cloth")),
                 modelOutput);
+    }
+
+    private void registerTrimmableArmor(Item item, ArmorItem.Type type) {
+        trimmableItem(item, List.of(TextureMapping.getItemTexture(item)), type);
+    }
+
+    private void trimmableItem(Item item, List<ResourceLocation> textures, ArmorItem.Type type) {
+        ResourceLocation modelId = ModelLocationUtils.getModelLocation(item);
+        List<ItemOverride> overrides = new ArrayList<>();
+        for (ItemModelGenerators.TrimModelData trim : TRIM_MODELS) {
+            ResourceLocation trimModel = modelId.withSuffix("_" + trim.name() + "_trim");
+            List<ResourceLocation> trimTextures = new ArrayList<>(textures);
+            trimTextures.add(
+                    ResourceLocation.withDefaultNamespace("trims/items/" + type.getName() + "_trim_" + trim.name()));
+            modelOutput.accept(trimModel, new OverridesModel(Optional.empty(), layers(trimTextures), List.of()));
+            overrides.add(
+                    new ItemOverride(ItemModelGenerators.TRIM_TYPE_PREDICATE_ID, trim.itemModelIndex(), trimModel));
+        }
+        generatedOverridesItem(item, layers(textures), overrides);
+    }
+
+    private static Map<String, ResourceLocation> layers(List<ResourceLocation> textures) {
+        Map<String, ResourceLocation> layers = new LinkedHashMap<>();
+        for (int i = 0; i < textures.size(); i++) {
+            layers.put("layer" + i, textures.get(i));
+        }
+        return layers;
     }
 
     private void registerJarBrain() {
@@ -2641,14 +2760,15 @@ public final class TTModelProvider implements DataProvider {
     }
 
     private void eldritchLock() {
+        Block lock = TTBlocks.ELDRITCH_LOCK.get();
         ResourceLocation model = ModelTemplates.CUBE_ORIENTABLE.create(
-                TTBlocks.ELDRITCH_LOCK.get(),
+                lock,
                 new TextureMapping()
                         .put(TextureSlot.FRONT, blockTexture("eldritch_lock_face"))
-                        .put(TextureSlot.SIDE, blockTexture("eldritch_lock_side"))
-                        .put(TextureSlot.TOP, blockTexture("eldritch_lock_side")),
+                        .put(TextureSlot.SIDE, blockTexture("eldritch_door"))
+                        .put(TextureSlot.TOP, blockTexture("eldritch_door")),
                 modelOutput);
-        blockStateOutput.accept(MultiVariantGenerator.multiVariant(TTBlocks.ELDRITCH_LOCK.get(), v(model))
+        blockStateOutput.accept(MultiVariantGenerator.multiVariant(lock, v(model))
                 .with(PropertyDispatch.property(BlockStateProperties.FACING)
                         .select(
                                 Direction.DOWN,
@@ -2666,7 +2786,15 @@ public final class TTModelProvider implements DataProvider {
                         .select(
                                 Direction.EAST,
                                 Variant.variant().with(VariantProperties.Y_ROT, VariantProperties.Rotation.R90))));
-        delegateItem(TTBlocks.ELDRITCH_LOCK.get().asItem(), model);
+        ResourceLocation item = ModelTemplates.CUBE_ORIENTABLE.createWithSuffix(
+                lock,
+                "_item",
+                new TextureMapping()
+                        .put(TextureSlot.FRONT, blockTexture("eldritch_lock_face"))
+                        .put(TextureSlot.SIDE, blockTexture("eldritch_lock_side"))
+                        .put(TextureSlot.TOP, blockTexture("eldritch_lock_side")),
+                modelOutput);
+        delegateItem(lock.asItem(), item);
     }
 
     private static final int INSET_DEPTH = 2;

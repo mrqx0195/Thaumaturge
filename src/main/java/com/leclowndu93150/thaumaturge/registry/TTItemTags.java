@@ -17,9 +17,13 @@ public final class TTItemTags {
     public static final TagKey<Item> RESEARCH_NOTES = key("research_notes");
     public static final TagKey<Item> LOOT_CONTAINERS = key("loot_containers");
     public static final TagKey<Item> RUNIC_SHIELDABLE = key("runic_shieldable");
+    public static final TagKey<Item> SHIELDS_WARDING = key("shields/warding");
+    public static final TagKey<Item> SHIELDS_REFLECTING = key("shields/reflecting");
+    public static final TagKey<Item> SHIELDS_SAPPING = key("shields/sapping");
     public static final TagKey<Item> SCAN_IRON = key("scan/f_matiron");
     public static final TagKey<Item> NITORS = key("nitors");
     public static final TagKey<Item> MEAT_CHUNKS = key("meat_chunks");
+    public static final TagKey<Item> SCANNABLE_DYNAMIC_TREE_BRANCHES = key("scan/dynamic_tree_branches");
 
     public static final TagKey<Item> GREATWOOD_LOGS = key("greatwood_logs");
     public static final TagKey<Item> SILVERWOOD_LOGS = key("silverwood_logs");
@@ -70,6 +74,8 @@ public final class TTItemTags {
     public static final TagKey<Item> STORAGE_BLOCKS_THAUMIUM = common("storage_blocks/thaumium");
     public static final TagKey<Item> STORAGE_BLOCKS_VOID_METAL = common("storage_blocks/void_metal");
     public static final TagKey<Item> STORAGE_BLOCKS_AMBER = common("storage_blocks/amber");
+    public static final TagKey<Item> STORAGE_BLOCKS_FLESH = common("storage_blocks/flesh");
+    public static final TagKey<Item> STORAGE_BLOCKS_TALLOW = common("storage_blocks/tallow");
 
     public static final TagKey<Item> CANDLES = key("candles");
 
@@ -81,6 +87,13 @@ public final class TTItemTags {
     public static final TagKey<Item> ARMORS_BOOTS = common("armors/boots");
 
     public static final TagKey<Item> SCRIBING_TOOLS = key("scribing_tools");
+    public static final TagKey<Item> CURIOSITIES = key("curiosities");
+    public static final TagKey<Item> TAINT_TOOLS = key("taint_tools");
+    public static final TagKey<Item> MODELLED_TRIMMABLE_ARMOR = key("modelled_trimmable_armor");
+    public static final TagKey<Item> TRIMMABLE_ARMOR = key("trimmable_armor");
+    public static final TagKey<Item> TRIM_MATERIALS = key("trim_materials");
+    public static final TagKey<Item> DT_BRANCHES_THAT_BURN = dynamicTrees("branches_that_burn");
+    public static final TagKey<Item> DT_SEEDS = dynamicTrees("seeds");
 
     private TTItemTags() {}
 
@@ -90,5 +103,9 @@ public final class TTItemTags {
 
     private static TagKey<Item> common(String path) {
         return TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", path));
+    }
+
+    private static TagKey<Item> dynamicTrees(String path) {
+        return TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath(TTIds.DYNAMIC_TREES, path));
     }
 }

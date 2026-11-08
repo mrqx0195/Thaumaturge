@@ -55,6 +55,7 @@ import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchNothin
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchObelisk;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchPillar;
 import com.leclowndu93150.thaumaturge.content.eldritch.block.BlockEldritchTrap;
+import com.leclowndu93150.thaumaturge.content.eldritch.lock.BlockEldritchDoor;
 import com.leclowndu93150.thaumaturge.content.eldritch.lock.BlockEldritchLock;
 import com.leclowndu93150.thaumaturge.content.eldritch.portal.BlockEldritchPortal;
 import com.leclowndu93150.thaumaturge.content.eldritch.reliquary.BlockEldritchReliquary;
@@ -66,6 +67,7 @@ import com.leclowndu93150.thaumaturge.content.essentia.bellows.BlockBellows;
 import com.leclowndu93150.thaumaturge.content.essentia.crystalizer.BlockEssentiaCrystalizer;
 import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockJar;
 import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockJarBrain;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockJarCreative;
 import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockJarVoid;
 import com.leclowndu93150.thaumaturge.content.essentia.reservoir.BlockEssentiaReservoir;
 import com.leclowndu93150.thaumaturge.content.essentia.smeltery.BlockAlembic;
@@ -334,6 +336,15 @@ public final class TTBlocks {
                     .sound(TTSoundTypes.JAR)
                     .noOcclusion());
 
+    public static final DeferredBlock<BlockJarCreative> JAR_CREATIVE = BLOCKS.registerBlock(
+            "jar_creative",
+            BlockJarCreative::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.NONE)
+                    .strength(0.3F)
+                    .sound(TTSoundTypes.JAR)
+                    .noOcclusion());
+
     public static final DeferredBlock<BlockTube> TUBE = BLOCKS.registerBlock("tube", BlockTube::new, tubeProps());
 
     public static final DeferredBlock<BlockTubeValve> TUBE_VALVE =
@@ -394,7 +405,8 @@ public final class TTBlocks {
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> 7)
                     .sound(TTSoundTypes.GORE)
-                    .noLootTable());
+                    .noLootTable()
+                    .randomTicks());
 
     public static final DeferredBlock<BlockPurifyingFluid> PURIFYING_FLUID = BLOCKS.registerBlock(
             "purifying_fluid",
@@ -1895,9 +1907,9 @@ public final class TTBlocks {
                     .sound(SoundType.STONE)
                     .requiresCorrectToolForDrops());
 
-    public static final DeferredBlock<Block> ELDRITCH_DOOR = BLOCKS.registerBlock(
+    public static final DeferredBlock<BlockEldritchDoor> ELDRITCH_DOOR = BLOCKS.registerBlock(
             "eldritch_door",
-            Block::new,
+            BlockEldritchDoor::new,
             BlockBehaviour.Properties.of()
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(-1.0F, Float.MAX_VALUE)

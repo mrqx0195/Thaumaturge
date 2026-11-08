@@ -10,7 +10,8 @@ import com.leclowndu93150.thaumaturge.api.essentia.IAspectQuery;
 import com.leclowndu93150.thaumaturge.api.items.GogglesAccess;
 import com.leclowndu93150.thaumaturge.client.render.aspect.AspectTagWorldRenderer;
 import com.leclowndu93150.thaumaturge.content.aura.node.BlockEntityNode;
-import com.leclowndu93150.thaumaturge.content.essentia.jar.BlockEntityJar;
+import com.leclowndu93150.thaumaturge.content.essentia.jar.AbstractBlockEntityJar;
+import com.leclowndu93150.thaumaturge.content.essentia.reservoir.BlockEntityEssentiaReservoir;
 import com.leclowndu93150.thaumaturge.content.infusion.BlockEntityInfusionMatrix;
 import com.leclowndu93150.thaumaturge.content.research.scan.ScanNode;
 import com.leclowndu93150.thaumaturge.registry.TTItems;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.Nullable;
 
 @EventBusSubscriber(modid = TTIds.MODID, value = Dist.CLIENT)
 public final class GogglesWorldOverlay {
-    private static final float TAG_SCALE_CAP = 0.5F;
+    private static final float TAG_SCALE_CAP = 0.3F;
     private static final double TAG_SCALE_GROW_TICKS = 10.0D;
     private static final float SPACE_ABOVE_LIFT = 0.4F;
     private static final float JAR_READOUT_LIFT = 0.25F;
@@ -84,8 +85,11 @@ public final class GogglesWorldOverlay {
 
         boolean spaceAbove = mc.level.getBlockState(pos.above()).isAir();
         Direction dir = spaceAbove ? Direction.UP : mc.player.getDirection().getOpposite();
+        if (!spaceAbove && (be instanceof AbstractBlockEntityJar || be instanceof BlockEntityEssentiaReservoir)) {
+            dir = AspectReadoutPlacement.visibleSide(mc.level, pos, dir);
+        }
         double y = pos.getY() + (spaceAbove ? SPACE_ABOVE_LIFT : 0.0F);
-        if (be instanceof BlockEntityJar && dir == Direction.UP) {
+        if (be instanceof AbstractBlockEntityJar && dir == Direction.UP) {
             y += JAR_READOUT_LIFT - scale * 2.0F;
         }
         drawTags(
@@ -98,10 +102,18 @@ public final class GogglesWorldOverlay {
                 dir,
                 scale,
                 readout.showAmounts(),
-                be instanceof BlockEntityJar ? scale * 0.4F : 0.0F);
+                be instanceof AbstractBlockEntityJar ? scale * 0.4F : 0.0F,
+                be instanceof BlockEntityEssentiaReservoir ? 1.2F : scale * 4.0F,
+                be instanceof BlockEntityEssentiaReservoir);
     }
 
     static AspectReadout readAspects(Level level, @Nullable BlockEntity blockEntity, BlockPos pos, Direction side) {
+        if (blockEntity instanceof BlockEntityEssentiaReservoir reservoir) {
+            return new AspectReadout(reservoir.contents(), true);
+        }
+        if (blockEntity instanceof AbstractBlockEntityJar jar) {
+            return new AspectReadout(jar.getAspects(), true);
+        }
         if (blockEntity instanceof BlockEntityInfusionMatrix matrix) {
             return new AspectReadout(matrix.remainingEssentia(), true);
         }
@@ -145,8 +157,23 @@ public final class GogglesWorldOverlay {
             Direction dir,
             float scale,
             boolean showAmounts,
-            float iconOffsetY) {
+            float iconOffsetY,
+            float columnSpacing,
+            boolean centerHorizontally) {
         AspectTagWorldRenderer.renderTagCloud(
-                poseStack, mc, x, y, z, aspects, dir, scale, TAG_ALPHA, aspect -> true, showAmounts, iconOffsetY);
+                poseStack,
+                mc,
+                x,
+                y,
+                z,
+                aspects,
+                dir,
+                scale,
+                TAG_ALPHA,
+                aspect -> true,
+                showAmounts,
+                iconOffsetY,
+                columnSpacing,
+                centerHorizontally);
     }
 }

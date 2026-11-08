@@ -27,6 +27,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
@@ -40,6 +41,7 @@ public final class BlockEntityManaPod extends AbstractSyncedBlockEntity {
     private static final Codec<ResourceKey<IAspect>> ASPECT_KEY_CODEC = LegacyIds.ASPECT_KEY_CODEC;
 
     private @Nullable ResourceKey<IAspect> aspect;
+    private boolean showcase;
 
     public BlockEntityManaPod(BlockPos pos, BlockState state) {
         super(TTBlockEntities.MANA_POD.get(), pos, state);
@@ -62,6 +64,15 @@ public final class BlockEntityManaPod extends AbstractSyncedBlockEntity {
         if (getLevel() != null && !getLevel().isClientSide()) {
             getLevel().sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 3);
         }
+    }
+
+    public boolean isShowcase() {
+        return showcase;
+    }
+
+    public void setShowcase() {
+        showcase = true;
+        setChanged();
     }
 
     public void checkGrowth() {
@@ -187,12 +198,21 @@ public final class BlockEntityManaPod extends AbstractSyncedBlockEntity {
         if (aspect != null) {
             TTNbt.store(output, "Aspect", ASPECT_KEY_CODEC, registries, aspect);
         }
+        if (showcase) {
+            output.putBoolean("Showcase", true);
+        }
     }
 
     @Override
     protected void loadAdditional(CompoundTag input, HolderLookup.Provider registries) {
         super.loadAdditional(input, registries);
+        ResourceKey<IAspect> previous = aspect;
         aspect = TTNbt.read(input, "Aspect", ASPECT_KEY_CODEC, registries).orElse(null);
+        showcase = input.getBoolean("Showcase");
+        Level current = level;
+        if (current != null && current.isClientSide() && !Objects.equals(previous, aspect)) {
+            current.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_IMMEDIATE);
+        }
     }
 
     @Override

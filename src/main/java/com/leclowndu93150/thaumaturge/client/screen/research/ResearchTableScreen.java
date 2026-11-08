@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -81,6 +82,8 @@ public final class ResearchTableScreen extends AbstractTTContainerScreen<MenuRes
     private static final int ARROW_PREV_U = 184;
     private static final int ARROW_NEXT_U = 208;
     private static final int ARROW_V = 208;
+    private static final int PALETTE_SCROLL_H = ARROW_Y + ARROW_H - PALETTE_Y;
+    private static final float PAGE_SOUND_VOLUME = 0.3F;
 
     private static final int SELECT1_CENTER_X = 21;
     private static final int SELECT2_CENTER_X = 79;
@@ -325,6 +328,9 @@ public final class ResearchTableScreen extends AbstractTTContainerScreen<MenuRes
     private List<Component> aspectTooltip(Holder<IAspect> aspect) {
         List<Component> lines = new ArrayList<>();
         lines.add(AspectComponents.name(aspect));
+        if (!aspect.value().isPrimal()) {
+            lines.add(AspectComponents.composition(aspect).withStyle(ChatFormatting.DARK_GRAY));
+        }
         return lines;
     }
 
@@ -670,8 +676,8 @@ public final class ResearchTableScreen extends AbstractTTContainerScreen<MenuRes
         Component line1 = Component.translatable("gui.thaumaturge.research_table.no_ink.1");
         int x = leftPos + SHEET_X + SHEET_SIZE / 2;
         int y = topPos + INK_WARN_Y;
-        graphics.drawString(font, line0, x - font.width(line0) / 2, y - font.lineHeight, 0xFFFF5555, true);
-        graphics.drawString(font, line1, x - font.width(line1) / 2, y, 0xFFFF5555, true);
+        graphics.drawString(font, line0, x - font.width(line0) / 2, y - font.lineHeight, 0xFFFF5555, false);
+        graphics.drawString(font, line1, x - font.width(line1) / 2, y, 0xFFFF5555, false);
     }
 
     private void drawSlotHints(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -851,36 +857,60 @@ public final class ResearchTableScreen extends AbstractTTContainerScreen<MenuRes
     }
 
     private boolean handleHelperArrows(double mx, double my) {
-        int lastPage = Math.max(0, (discoveredCompounds().size() - 1) / HELPER_ROWS);
         int center = leftPos + SHEET_X + SHEET_SIZE / 2;
-        if (helperPage > 0
-                && inRect(mx, my, center - HELPER_PAGE_HALF_GAP - ARROW_W, topPos + HELPER_ARROW_Y, ARROW_W, ARROW_H)) {
-            helperPage--;
-            playSound(TTSounds.KEY.get(), 0.3F, 1.0F);
-            return true;
+        if (inRect(mx, my, center - HELPER_PAGE_HALF_GAP - ARROW_W, topPos + HELPER_ARROW_Y, ARROW_W, ARROW_H)) {
+            return stepHelperPage(-1);
         }
-        if (helperPage < lastPage
-                && inRect(mx, my, center + HELPER_PAGE_HALF_GAP, topPos + HELPER_ARROW_Y, ARROW_W, ARROW_H)) {
-            helperPage++;
-            playSound(TTSounds.KEY.get(), 0.3F, 1.0F);
-            return true;
+        if (inRect(mx, my, center + HELPER_PAGE_HALF_GAP, topPos + HELPER_ARROW_Y, ARROW_W, ARROW_H)) {
+            return stepHelperPage(1);
         }
         return false;
     }
 
     private boolean handleArrows(double mx, double my) {
-        int lastPage = lastPage(discoveredAspects().size());
-        if (page > 0 && inRect(mx, my, leftPos + ARROW_PREV_X, topPos + ARROW_Y, ARROW_W, ARROW_H)) {
-            page--;
-            playSound(TTSounds.KEY.get(), 0.3F, 1.0F);
-            return true;
+        if (inRect(mx, my, leftPos + ARROW_PREV_X, topPos + ARROW_Y, ARROW_W, ARROW_H)) {
+            return stepPalettePage(-1);
         }
-        if (page < lastPage && inRect(mx, my, leftPos + ARROW_NEXT_X, topPos + ARROW_Y, ARROW_W, ARROW_H)) {
-            page++;
-            playSound(TTSounds.KEY.get(), 0.3F, 1.0F);
-            return true;
+        if (inRect(mx, my, leftPos + ARROW_NEXT_X, topPos + ARROW_Y, ARROW_W, ARROW_H)) {
+            return stepPalettePage(1);
         }
         return false;
+    }
+
+    private boolean stepHelperPage(int delta) {
+        int target = helperPage + delta;
+        if (target < 0 || target > Math.max(0, (discoveredCompounds().size() - 1) / HELPER_ROWS)) {
+            return false;
+        }
+        helperPage = target;
+        playSound(TTSounds.KEY.get(), PAGE_SOUND_VOLUME, 1.0F);
+        return true;
+    }
+
+    private boolean stepPalettePage(int delta) {
+        int target = page + delta;
+        if (target < 0 || target > lastPage(discoveredAspects().size())) {
+            return false;
+        }
+        page = target;
+        playSound(TTSounds.KEY.get(), PAGE_SOUND_VOLUME, 1.0F);
+        return true;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (scrollY != 0.0) {
+            int step = scrollY < 0.0 ? 1 : -1;
+            if (helperOpen && inRect(mouseX, mouseY, leftPos + SHEET_X, topPos + SHEET_Y, SHEET_SIZE, SHEET_SIZE)) {
+                stepHelperPage(step);
+                return true;
+            }
+            if (inRect(mouseX, mouseY, leftPos + PALETTE_X, topPos + PALETTE_Y, PALETTE_W, PALETTE_SCROLL_H)) {
+                stepPalettePage(step);
+                return true;
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     private boolean handleCombineButton(double mx, double my) {
